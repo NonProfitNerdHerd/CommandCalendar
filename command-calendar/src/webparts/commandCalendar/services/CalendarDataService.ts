@@ -78,47 +78,118 @@ export class CalendarDataService {
     rangeEnd: Date
   ): Promise<ICalendarEvent[]> {
     const escapedListTitle: string = source.listTitle.replace(/'/g, "''");
-    const startIso: string = rangeStart.toISOString();
-    const endIso: string = rangeEnd.toISOString();
-    const filter: string = `EndDate ge datetime'${startIso}' and EventDate le datetime'${endIso}'`;
     const query: string =
-      `$select=Id,Title,EventDate,EndDate,Category,Location,Description,fAllDayEvent&` +
-      `$filter=${encodeURIComponent(filter)}&$top=5000`;
+      '$select=Id,Title,EventDate,EndDate,Category,Location,Description,fAllDayEvent&' +
+      '$orderby=EventDate asc&$top=5000';
 
     let requestUrl: string =
       `${source.siteUrl}/_api/web/lists/getByTitle('${escapedListTitle}')/items?${query}`;
     const collectedEvents: ICalendarEvent[] = [];
 
     while (requestUrl) {
+      try {
+        const payload: unknown = await this._requestJsonWithFallback(requestUrl);
+        const rows: unknown[] = this._extractRows(payload);
+        rows.forEach((row: unknown) => {
+          const mappedEvent: ICalendarEvent | undefined = this._mapEvent(row, source);
+          if (
+            mappedEvent &&
+            mappedEvent.end.getTime() >= rangeStart.getTime() &&
+            mappedEvent.start.getTime() <= rangeEnd.getTime()
+          ) {
+            collectedEvents.push(mappedEvent);
+          }
+        });
+
+        requestUrl = this._extractNextLink(payload);
+      } catch (error) {
+        const message: string =
+          error instanceof Error ? error.message : 'Unknown error while loading events.';
+        throw new Error(`Unable to load "${source.displayName}". ${message}`);
+      }
+    }
+
+    return collectedEvents;
+  }
+
+  private async _requestJsonWithFallback(requestUrl: string): Promise<unknown> {
+    const acceptHeaders: string[] = [
+      'application/json;odata=nometadata',
+      'application/json;odata=minimalmetadata',
+      'application/json;odata=verbose',
+      'application/json'
+    ];
+
+    let lastResponse: SPHttpClientResponse | undefined;
+    for (const acceptHeader of acceptHeaders) {
       const response: SPHttpClientResponse = await this._spHttpClient.get(
         requestUrl,
         SPHttpClient.configurations.v1,
         {
           headers: {
-            Accept: 'application/json;odata=nometadata'
+            Accept: acceptHeader
           }
         }
       );
 
-      if (!response.ok) {
-        throw new Error(
-          `Unable to load "${source.displayName}" (${response.status} ${response.statusText}).`
-        );
+      if (response.ok) {
+        return response.json();
       }
 
-      const payload: { value?: unknown[]; ['@odata.nextLink']?: string } = await response.json();
-      const rows: unknown[] = payload.value || [];
-      rows.forEach((row: unknown) => {
-        const mappedEvent: ICalendarEvent | undefined = this._mapEvent(row, source);
-        if (mappedEvent) {
-          collectedEvents.push(mappedEvent);
-        }
-      });
-
-      requestUrl = payload['@odata.nextLink'] || '';
+      lastResponse = response;
+      if (response.status !== 406) {
+        break;
+      }
     }
 
-    return collectedEvents;
+    throw new Error(
+      `Unable to load calendar items (${lastResponse ? `${lastResponse.status} ${lastResponse.statusText}` : 'unknown error'}). ` +
+      'Verify the calendar list title exactly matches the list display name and that you have read access.'
+    );
+  }
+
+  private _extractRows(payload: unknown): unknown[] {
+    if (!payload || typeof payload !== 'object') {
+      return [];
+    }
+
+    const normalizedPayload: Record<string, unknown> = payload as Record<string, unknown>;
+    if (Array.isArray(normalizedPayload.value)) {
+      return normalizedPayload.value;
+    }
+
+    const dValue: unknown = normalizedPayload.d;
+    if (dValue && typeof dValue === 'object') {
+      const dObject: Record<string, unknown> = dValue as Record<string, unknown>;
+      if (Array.isArray(dObject.results)) {
+        return dObject.results;
+      }
+    }
+
+    return [];
+  }
+
+  private _extractNextLink(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return '';
+    }
+
+    const normalizedPayload: Record<string, unknown> = payload as Record<string, unknown>;
+    const odataNextLink: unknown = normalizedPayload['@odata.nextLink'];
+    if (typeof odataNextLink === 'string') {
+      return odataNextLink;
+    }
+
+    const dValue: unknown = normalizedPayload.d;
+    if (dValue && typeof dValue === 'object') {
+      const dObject: Record<string, unknown> = dValue as Record<string, unknown>;
+      const legacyNext: unknown = dObject.__next;
+      if (typeof legacyNext === 'string') {
+        return legacyNext;
+      }
+    }
+
+    return '';
   }
 
   private _mapEvent(row: unknown, source: ICalendarSourceConfig): ICalendarEvent | undefined {
@@ -152,6 +223,17 @@ export class CalendarDataService {
   private _extractCategories(rawCategory: unknown): string[] {
     if (!rawCategory) {
       return ['Uncategorized'];
+    }
+
+    if (typeof rawCategory === 'object') {
+      const categoryObject: Record<string, unknown> = rawCategory as Record<string, unknown>;
+      const results: unknown = categoryObject.results;
+      if (Array.isArray(results)) {
+        const categories: string[] = results
+          .map((entry: unknown) => String(entry || '').trim())
+          .filter((entry: string) => entry.length > 0);
+        return categories.length > 0 ? categories : ['Uncategorized'];
+      }
     }
 
     const categoryText: string = String(rawCategory).trim();
