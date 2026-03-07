@@ -264,16 +264,13 @@ export class CalendarDataService {
       recurrenceIdValue.length > 0 && recurrenceIdValue.toLowerCase() !== 'null';
     const isRecurringMaster: boolean = Boolean(item.fRecurrence) && !isExpandedOccurrence;
     if (isRecurringMaster) {
-      const recurringEvents: ICalendarEvent[] = this._expandRecurringEvent(
+      return this._expandRecurringEvent(
         item,
         source,
         rangeStart,
         rangeEnd,
         displayFormUrl
       );
-      if (recurringEvents.length > 0) {
-        return recurringEvents;
-      }
     }
 
     const mappedEvent: ICalendarEvent | undefined = this._mapSingleEvent(
@@ -355,7 +352,7 @@ export class CalendarDataService {
     }
 
     if (!recurrenceXmlRaw) {
-      return [baseEvent];
+      return [];
     }
 
     const parsedRule: IParsedRecurrenceRule | undefined = this._parseRecurrenceRule(
@@ -363,7 +360,7 @@ export class CalendarDataService {
       baseEvent.start
     );
     if (!parsedRule) {
-      return [baseEvent];
+      return [];
     }
 
     const durationMs: number = Math.max(1, baseEvent.end.getTime() - baseEvent.start.getTime());

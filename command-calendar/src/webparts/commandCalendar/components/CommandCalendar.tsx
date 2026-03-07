@@ -18,7 +18,9 @@ import { ICalendarEvent, ICalendarSourceConfig } from '../models/CalendarModels'
 import { CalendarDataService, parseCalendarSources } from '../services/CalendarDataService';
 
 const DAY_LABELS: string[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const GANTT_ZOOM_ORDER: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
+const GANTT_RANGE_OPTIONS: number[] = [30, 60, 90, 120];
+const HOUR_SLOTS: number[] = Array.from({ length: 24 }, (_: unknown, index: number) => index);
+type CalendarMode = 'day' | 'week' | 'month';
 
 const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalendarProps) => {
   const [events, setEvents] = React.useState<ICalendarEvent[]>([]);
@@ -26,9 +28,10 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   const [errorMessage, setErrorMessage] = React.useState<string | undefined>();
   const [selectedCategories, setSelectedCategories] = React.useState<string[]>([]);
   const [activeView, setActiveView] = React.useState<string>('gantt');
-  const [calendarAnchor, setCalendarAnchor] = React.useState<Date>(startOfMonth(new Date()));
+  const [calendarFocusDate, setCalendarFocusDate] = React.useState<Date>(startOfDay(new Date()));
+  const [calendarMode, setCalendarMode] = React.useState<CalendarMode>('month');
   const [reloadToken, setReloadToken] = React.useState<number>(0);
-  const [ganttZoomIndex, setGanttZoomIndex] = React.useState<number>(1);
+  const [ganttRangeDays, setGanttRangeDays] = React.useState<number>(60);
 
   const dataService: CalendarDataService = React.useMemo(
     () => new CalendarDataService(props.spHttpClient),
@@ -126,24 +129,24 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     );
   }, [events, selectedCategories]);
 
-  const zoomKey: 'day' | 'week' | 'month' = GANTT_ZOOM_ORDER[ganttZoomIndex];
-  const baseSpanDays: number = Math.max(30, props.lookAheadDays + Math.max(0, props.lookBackDays));
-  const timelineStart: Date = React.useMemo(
-    () => addDays(startOfDay(new Date()), -Math.max(0, props.lookBackDays)),
-    [props.lookBackDays]
-  );
-  const timelineDays: number = getTimelineSpanDays(zoomKey, baseSpanDays);
+  const timelineStart: Date = startOfDay(new Date());
+  const timelineDays: number = ganttRangeDays;
   const timelineEnd: Date = addDays(timelineStart, timelineDays);
   const ganttTicks: IGanttTick[] = React.useMemo(
-    () => buildGanttTicks(timelineStart, timelineDays, zoomKey),
-    [timelineDays, timelineStart, zoomKey]
+    () => buildGanttTicks(timelineStart, timelineDays),
+    [timelineDays, timelineStart]
   );
 
   const monthGridDates: Date[] = React.useMemo(() => {
-    const monthStart: Date = startOfMonth(calendarAnchor);
+    const monthStart: Date = startOfMonth(calendarFocusDate);
     const gridStart: Date = addDays(monthStart, -monthStart.getDay());
     return Array.from({ length: 42 }, (_: unknown, index: number) => addDays(gridStart, index));
-  }, [calendarAnchor]);
+  }, [calendarFocusDate]);
+
+  const weekDates: Date[] = React.useMemo(() => {
+    const weekStart: Date = startOfWeek(calendarFocusDate);
+    return Array.from({ length: 7 }, (_: unknown, index: number) => addDays(weekStart, index));
+  }, [calendarFocusDate]);
 
   const sourceWarnings: string[] = parsedSources.errors;
   const hasNoSourcesConfigured: boolean = parsedSources.sources.length === 0;
@@ -168,27 +171,56 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     });
   };
 
-  const onGanttWheel = (ev: React.WheelEvent<HTMLDivElement>): void => {
-    if (Math.abs(ev.deltaY) < 4) {
-      return;
-    }
-
-    ev.preventDefault();
-    setGanttZoomIndex((currentIndex: number) => {
-      if (ev.deltaY < 0) {
-        return Math.max(0, currentIndex - 1);
-      }
-
-      return Math.min(GANTT_ZOOM_ORDER.length - 1, currentIndex + 1);
-    });
-  };
-
   const onEventClick = (event: ICalendarEvent): void => {
     if (!event.itemUrl) {
       return;
     }
 
     window.open(event.itemUrl, '_blank');
+  };
+
+  const shiftCalendar = (delta: number): void => {
+    setCalendarFocusDate((currentDate: Date) => {
+      if (calendarMode === 'day') {
+        return addDays(currentDate, delta);
+      }
+      if (calendarMode === 'week') {
+        return addDays(currentDate, delta * 7);
+      }
+      return addMonths(currentDate, delta);
+    });
+  };
+
+  const onCalendarModeSelected = (mode: CalendarMode): void => {
+    setCalendarMode(mode);
+  };
+
+  const renderCalendarEventButton = (
+    event: ICalendarEvent,
+    className: string,
+    showDot: boolean
+  ): JSX.Element => {
+    return (
+      <TooltipHost
+        content={renderEventTooltip(event)}
+        directionalHint={DirectionalHint.bottomLeftEdge}
+      >
+        <button
+          type="button"
+          className={className}
+          onClick={() => onEventClick(event)}
+          title={event.title}
+        >
+          {showDot && (
+            <span
+              className={styles.calendarItemDot}
+              style={{ backgroundColor: event.sourceColor }}
+            />
+          )}
+          <span className={styles.calendarItemText}>{event.title}</span>
+        </button>
+      </TooltipHost>
+    );
   };
 
   const renderGanttView = (): JSX.Element => {
@@ -201,25 +233,25 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     }
 
     return (
-      <div className={styles.ganttView} onWheel={onGanttWheel}>
+      <div className={styles.ganttView}>
         <div className={styles.ganttToolbar}>
           <div className={styles.ganttRangeSummary}>
             {formatDate(timelineStart)} - {formatDate(timelineEnd)}
           </div>
           <div className={styles.ganttZoomLegend}>
-            Scroll over the chart to zoom ({zoomKey})
+            Select timeline range
           </div>
           <div className={styles.ganttZoomButtons}>
-            {GANTT_ZOOM_ORDER.map((option: 'day' | 'week' | 'month', index: number) => (
+            {GANTT_RANGE_OPTIONS.map((rangeDays: number) => (
               <button
                 type="button"
-                key={option}
+                key={rangeDays}
                 className={`${styles.ganttZoomButton} ${
-                  index === ganttZoomIndex ? styles.ganttZoomButtonActive : ''
+                  rangeDays === ganttRangeDays ? styles.ganttZoomButtonActive : ''
                 }`}
-                onClick={() => setGanttZoomIndex(index)}
+                onClick={() => setGanttRangeDays(rangeDays)}
               >
-                {option}
+                {rangeDays} days
               </button>
             ))}
           </div>
@@ -301,70 +333,184 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   };
 
   const renderCalendarView = (): JSX.Element => {
-    return (
-      <div className={styles.calendarView}>
-        <div className={styles.calendarHeader}>
-          <div className={styles.calendarTitle}>
-            {calendarAnchor.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
-          </div>
-          <div className={styles.calendarActions}>
-            <DefaultButton
-              text="Previous"
-              onClick={() => setCalendarAnchor(addMonths(calendarAnchor, -1))}
-            />
-            <DefaultButton text="Today" onClick={() => setCalendarAnchor(startOfMonth(new Date()))} />
-            <DefaultButton text="Next" onClick={() => setCalendarAnchor(addMonths(calendarAnchor, 1))} />
-          </div>
-        </div>
-        <div className={styles.calendarGrid}>
-          {DAY_LABELS.map((dayLabel: string) => (
-            <div key={dayLabel} className={`${styles.calendarCell} ${styles.calendarDayLabel}`}>
-              {dayLabel}
-            </div>
-          ))}
-          {monthGridDates.map((gridDate: Date) => {
-            const dayEvents: ICalendarEvent[] = filteredEvents
-              .filter((event: ICalendarEvent) =>
-                rangesOverlap(event.start, event.end, startOfDay(gridDate), endOfDay(gridDate))
-              )
-              .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+    const calendarTitle: string = getCalendarTitle(calendarFocusDate, calendarMode);
 
-            const isCurrentMonth: boolean = gridDate.getMonth() === calendarAnchor.getMonth();
+    const renderMonthView = (): JSX.Element => (
+      <div className={styles.calendarGrid}>
+        {DAY_LABELS.map((dayLabel: string) => (
+          <div key={dayLabel} className={`${styles.calendarCell} ${styles.calendarDayLabel}`}>
+            {dayLabel}
+          </div>
+        ))}
+        {monthGridDates.map((gridDate: Date) => {
+          const dayEvents: ICalendarEvent[] = filteredEvents
+            .filter((event: ICalendarEvent) =>
+              rangesOverlap(event.start, event.end, startOfDay(gridDate), endOfDay(gridDate))
+            )
+            .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+
+          const isCurrentMonth: boolean = gridDate.getMonth() === calendarFocusDate.getMonth();
+          return (
+            <div
+              key={gridDate.toISOString()}
+              className={`${styles.calendarCell} ${isCurrentMonth ? '' : styles.calendarCellMuted}`}
+            >
+              <div className={styles.calendarDate}>{gridDate.getDate()}</div>
+              <div className={styles.calendarItems}>
+                {dayEvents.slice(0, 3).map((event: ICalendarEvent) => (
+                  <div key={`${event.id}-${gridDate.toISOString()}`}>
+                    {renderCalendarEventButton(event, styles.calendarItemButton, true)}
+                  </div>
+                ))}
+                {dayEvents.length > 3 && (
+                  <div className={styles.moreItems}>+{dayEvents.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    const renderDayView = (): JSX.Element => {
+      const dayStart: Date = startOfDay(calendarFocusDate);
+      const dayEnd: Date = endOfDay(calendarFocusDate);
+      const dayEvents: ICalendarEvent[] = filteredEvents
+        .filter((event: ICalendarEvent) => rangesOverlap(event.start, event.end, dayStart, dayEnd))
+        .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+      const allDayEvents: ICalendarEvent[] = dayEvents.filter((event: ICalendarEvent) => event.isAllDay);
+
+      return (
+        <div className={styles.agendaView}>
+          {allDayEvents.length > 0 && (
+            <div className={styles.agendaAllDayRow}>
+              <div className={styles.agendaHourLabel}>All day</div>
+              <div className={styles.agendaHourContent}>
+                {allDayEvents.map((event: ICalendarEvent) => (
+                  <div className={styles.agendaEventChip} key={`${event.id}-allday`}>
+                    {renderCalendarEventButton(event, styles.agendaEventButton, true)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {HOUR_SLOTS.map((hour: number) => {
+            const slotStart: Date = new Date(
+              dayStart.getFullYear(),
+              dayStart.getMonth(),
+              dayStart.getDate(),
+              hour,
+              0,
+              0,
+              0
+            );
+            const slotEnd: Date = addHours(slotStart, 1);
+            const slotEvents: ICalendarEvent[] = dayEvents.filter((event: ICalendarEvent) =>
+              isEventStartingInSlot(event, slotStart, slotEnd)
+            );
+
             return (
-              <div
-                key={gridDate.toISOString()}
-                className={`${styles.calendarCell} ${isCurrentMonth ? '' : styles.calendarCellMuted}`}
-              >
-                <div className={styles.calendarDate}>{gridDate.getDate()}</div>
-                <div className={styles.calendarItems}>
-                  {dayEvents.slice(0, 3).map((event: ICalendarEvent) => (
-                    <TooltipHost
-                      key={`${event.id}-${gridDate.toISOString()}`}
-                      content={renderEventTooltip(event)}
-                      directionalHint={DirectionalHint.bottomLeftEdge}
-                    >
-                      <button
-                        type="button"
-                        className={styles.calendarItemButton}
-                        onClick={() => onEventClick(event)}
-                        title={event.title}
-                      >
-                        <span
-                          className={styles.calendarItemDot}
-                          style={{ backgroundColor: event.sourceColor }}
-                        />
-                        <span className={styles.calendarItemText}>{event.title}</span>
-                      </button>
-                    </TooltipHost>
+              <div className={styles.agendaHourRow} key={`${dayStart.toISOString()}-${hour}`}>
+                <div className={styles.agendaHourLabel}>{formatHourLabel(hour)}</div>
+                <div className={styles.agendaHourContent}>
+                  {slotEvents.map((event: ICalendarEvent) => (
+                    <div className={styles.agendaEventChip} key={`${event.id}-${hour}`}>
+                      {renderCalendarEventButton(event, styles.agendaEventButton, true)}
+                    </div>
                   ))}
-                  {dayEvents.length > 3 && (
-                    <div className={styles.moreItems}>+{dayEvents.length - 3} more</div>
-                  )}
                 </div>
               </div>
             );
           })}
         </div>
+      );
+    };
+
+    const renderWeekView = (): JSX.Element => {
+      const weekStart: Date = startOfWeek(calendarFocusDate);
+      const weekEnd: Date = endOfDay(addDays(weekStart, 6));
+      const weekEvents: ICalendarEvent[] = filteredEvents
+        .filter((event: ICalendarEvent) => rangesOverlap(event.start, event.end, weekStart, weekEnd))
+        .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+
+      return (
+        <div className={styles.weekView}>
+          <div className={styles.weekHeaderRow}>
+            <div className={styles.weekTimeColumnHeader} />
+            {weekDates.map((weekDate: Date) => (
+              <div className={styles.weekDayHeader} key={`header-${weekDate.toISOString()}`}>
+                {weekDate.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </div>
+            ))}
+          </div>
+          {HOUR_SLOTS.map((hour: number) => (
+            <div className={styles.weekHourRow} key={`week-hour-${hour}`}>
+              <div className={styles.weekTimeColumn}>{formatHourLabel(hour)}</div>
+              {weekDates.map((weekDate: Date) => {
+                const slotStart: Date = new Date(
+                  weekDate.getFullYear(),
+                  weekDate.getMonth(),
+                  weekDate.getDate(),
+                  hour,
+                  0,
+                  0,
+                  0
+                );
+                const slotEnd: Date = addHours(slotStart, 1);
+                const slotEvents: ICalendarEvent[] = weekEvents.filter((event: ICalendarEvent) =>
+                  isEventStartingInSlot(event, slotStart, slotEnd)
+                );
+
+                return (
+                  <div className={styles.weekHourCell} key={`${weekDate.toISOString()}-${hour}`}>
+                    {slotEvents.map((event: ICalendarEvent) => (
+                      <div className={styles.weekEventWrapper} key={`${event.id}-${hour}`}>
+                        {renderCalendarEventButton(event, styles.weekEventButton, false)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    return (
+      <div className={styles.calendarView}>
+        <div className={styles.calendarHeader}>
+          <div className={styles.calendarTitle}>{calendarTitle}</div>
+          <div className={styles.calendarActions}>
+            <DefaultButton
+              text="Previous"
+              onClick={() => shiftCalendar(-1)}
+            />
+            <DefaultButton text="Today" onClick={() => setCalendarFocusDate(startOfDay(new Date()))} />
+            <DefaultButton text="Next" onClick={() => shiftCalendar(1)} />
+          </div>
+          <div className={styles.calendarModeButtons}>
+            {(['day', 'week', 'month'] as CalendarMode[]).map((mode: CalendarMode) => (
+              <button
+                type="button"
+                key={mode}
+                className={`${styles.calendarModeButton} ${
+                  mode === calendarMode ? styles.calendarModeButtonActive : ''
+                }`}
+                onClick={() => onCalendarModeSelected(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+        {calendarMode === 'month' && renderMonthView()}
+        {calendarMode === 'day' && renderDayView()}
+        {calendarMode === 'week' && renderWeekView()}
       </div>
     );
   };
@@ -491,28 +637,8 @@ interface IGanttTick {
   label: string;
 }
 
-function getTimelineSpanDays(zoomKey: 'day' | 'week' | 'month', baseSpanDays: number): number {
-  if (zoomKey === 'day') {
-    return Math.max(28, Math.floor(baseSpanDays * 0.6));
-  }
-
-  if (zoomKey === 'month') {
-    return Math.max(180, Math.floor(baseSpanDays * 2));
-  }
-
-  return Math.max(90, baseSpanDays);
-}
-
-function buildGanttTicks(
-  timelineStart: Date,
-  timelineDays: number,
-  zoomKey: 'day' | 'week' | 'month'
-): IGanttTick[] {
-  if (zoomKey === 'month') {
-    return buildMonthTicks(timelineStart, timelineDays);
-  }
-
-  const stepDays: number = zoomKey === 'week' ? 7 : getDayStep(timelineDays);
+function buildGanttTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
+  const stepDays: number = getGanttStep(timelineDays);
   const ticks: IGanttTick[] = [];
 
   for (let offset = 0; offset <= timelineDays; offset += stepDays) {
@@ -520,66 +646,25 @@ function buildGanttTicks(
     ticks.push({
       key: `${tickDate.toISOString()}-${offset}`,
       leftPercent: (offset / timelineDays) * 100,
-      label:
-        zoomKey === 'week'
-          ? `Wk ${getWeekNumber(tickDate)}`
-          : tickDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      label: tickDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     });
   }
 
   return ticks;
 }
 
-function buildMonthTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
-  const ticks: IGanttTick[] = [];
-  const timelineEnd: Date = addDays(timelineStart, timelineDays);
-  let cursor: Date = new Date(timelineStart.getFullYear(), timelineStart.getMonth(), 1);
-
-  if (cursor.getTime() < timelineStart.getTime()) {
-    cursor = addMonths(cursor, 1);
-  }
-
-  while (cursor.getTime() <= timelineEnd.getTime()) {
-    const offsetDays: number = dateDiffInDays(timelineStart, cursor);
-    ticks.push({
-      key: cursor.toISOString(),
-      leftPercent: Math.max(0, (offsetDays / timelineDays) * 100),
-      label: cursor.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
-    });
-    cursor = addMonths(cursor, 1);
-  }
-
-  if (ticks.length === 0) {
-    ticks.push({
-      key: timelineStart.toISOString(),
-      leftPercent: 0,
-      label: timelineStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    });
-  }
-
-  return ticks;
-}
-
-function getDayStep(timelineDays: number): number {
-  if (timelineDays <= 35) {
+function getGanttStep(timelineDays: number): number {
+  if (timelineDays <= 30) {
     return 1;
   }
-  if (timelineDays <= 70) {
+  if (timelineDays <= 60) {
     return 2;
   }
-  if (timelineDays <= 120) {
-    return 5;
+  if (timelineDays <= 90) {
+    return 3;
   }
 
-  return 10;
-}
-
-function getWeekNumber(date: Date): number {
-  const utcDate: Date = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum: number = utcDate.getUTCDay() || 7;
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
-  const yearStart: Date = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
-  return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return 5;
 }
 
 function renderEventTooltip(event: ICalendarEvent): JSX.Element {
@@ -604,7 +689,7 @@ function addDays(date: Date, days: number): Date {
 function addMonths(date: Date, months: number): Date {
   const nextDate: Date = new Date(date.getTime());
   nextDate.setMonth(nextDate.getMonth() + months);
-  return startOfMonth(nextDate);
+  return startOfDay(nextDate);
 }
 
 function startOfDay(date: Date): Date {
@@ -617,6 +702,17 @@ function endOfDay(date: Date): Date {
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function startOfWeek(date: Date): Date {
+  const dayStart: Date = startOfDay(date);
+  return addDays(dayStart, -dayStart.getDay());
+}
+
+function addHours(date: Date, hours: number): Date {
+  const nextDate: Date = new Date(date.getTime());
+  nextDate.setHours(nextDate.getHours() + hours);
+  return nextDate;
 }
 
 function dateDiffInDays(startDate: Date, endDate: Date): number {
@@ -673,6 +769,37 @@ function formatDateRange(startDate: Date, endDate: Date): string {
   const startText: string = formatDate(startDate);
   const endText: string = formatDate(endDate);
   return startText === endText ? startText : `${startText} - ${endText}`;
+}
+
+function formatHourLabel(hour: number): string {
+  const dateForLabel: Date = new Date(2000, 0, 1, hour, 0, 0, 0);
+  return dateForLabel.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function getCalendarTitle(calendarDate: Date, mode: CalendarMode): string {
+  if (mode === 'day') {
+    return calendarDate.toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  if (mode === 'week') {
+    const weekStart: Date = startOfWeek(calendarDate);
+    const weekEnd: Date = addDays(weekStart, 6);
+    return `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
+  }
+
+  return calendarDate.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function isEventStartingInSlot(event: ICalendarEvent, slotStart: Date, slotEnd: Date): boolean {
+  return event.start.getTime() >= slotStart.getTime() && event.start.getTime() < slotEnd.getTime();
 }
 
 export default CommandCalendar;

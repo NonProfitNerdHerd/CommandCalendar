@@ -236,6 +236,26 @@
   gap: 8px;
 }
 
+.calendarModeButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.calendarModeButton {
+  border: 1px solid #c8c6c4;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 2px 10px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.calendarModeButtonActive {
+  border-color: #0078d4;
+  color: #0078d4;
+  font-weight: 600;
+}
+
 .calendarGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(100px, 1fr));
@@ -310,6 +330,105 @@
 .moreItems {
   font-size: 11px;
   color: #605e5c;
+}
+
+.agendaView {
+  border: 1px solid #edebe9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.agendaAllDayRow,
+.agendaHourRow {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  border-bottom: 1px solid #f3f2f1;
+}
+
+.agendaHourLabel {
+  font-size: 11px;
+  color: #605e5c;
+  padding: 8px;
+  border-right: 1px solid #f3f2f1;
+}
+
+.agendaHourContent {
+  min-height: 34px;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.agendaEventChip {
+  min-width: 120px;
+}
+
+.agendaEventButton {
+  width: 100%;
+  border: 1px solid #edebe9;
+  border-radius: 4px;
+  background: #faf9f8;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.weekView {
+  border: 1px solid #edebe9;
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.weekHeaderRow,
+.weekHourRow {
+  display: grid;
+  grid-template-columns: 70px repeat(7, minmax(120px, 1fr));
+}
+
+.weekTimeColumnHeader,
+.weekDayHeader,
+.weekTimeColumn,
+.weekHourCell {
+  border-right: 1px solid #edebe9;
+  border-bottom: 1px solid #edebe9;
+}
+
+.weekDayHeader {
+  padding: 6px;
+  background: #f8f8f8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.weekTimeColumn {
+  padding: 6px;
+  font-size: 11px;
+  color: #605e5c;
+}
+
+.weekHourCell {
+  min-height: 32px;
+  padding: 2px;
+}
+
+.weekEventWrapper {
+  margin-bottom: 2px;
+}
+
+.weekEventButton {
+  width: 100%;
+  border: 1px solid #edebe9;
+  border-radius: 4px;
+  background: #faf9f8;
+  padding: 2px 4px;
+  text-align: left;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .quadView {
@@ -408,6 +527,11 @@
   .ganttRow {
     grid-template-columns: 1fr;
   }
+
+  .calendarHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 760px) {
@@ -421,5 +545,15 @@
 
   .quadView {
     grid-template-columns: repeat(1, minmax(220px, 1fr));
+  }
+
+  .agendaAllDayRow,
+  .agendaHourRow {
+    grid-template-columns: 70px 1fr;
+  }
+
+  .weekHeaderRow,
+  .weekHourRow {
+    grid-template-columns: 60px repeat(7, minmax(95px, 1fr));
   }
 }
