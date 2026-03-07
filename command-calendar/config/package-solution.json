@@ -3,7 +3,7 @@
   "solution": {
     "name": "command-calendar-client-side-solution",
     "id": "8aba1103-bf53-4a4b-8dfd-8bb57e8997e2",
-    "version": "1.0.5.0",
+    "version": "1.0.6.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -30,7 +30,7 @@
         "title": "command-calendar Feature",
         "description": "The feature that activates elements of the command-calendar solution.",
         "id": "585a4f06-d053-4495-b8bc-3e9c0f847716",
-        "version": "1.0.5.0"
+        "version": "1.0.6.0"
       }
     ]
   },

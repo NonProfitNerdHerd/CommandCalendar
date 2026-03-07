@@ -39,6 +39,7 @@ interface IHorizonBlock {
   endOffsetDays: number;
 }
 interface ISwimLaneDefinition {
+  order: number;
   laneName: string;
   calendarNames: string[];
 }
@@ -210,6 +211,16 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     return mapping;
   }, [parsedSources.sources, parsedSwimLaneMappings]);
 
+  const laneOrderMap: Record<string, number> = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    parsedSwimLaneMappings.forEach((laneDefinition: ISwimLaneDefinition) => {
+      if (typeof map[laneDefinition.laneName] === 'undefined') {
+        map[laneDefinition.laneName] = laneDefinition.order;
+      }
+    });
+    return map;
+  }, [parsedSwimLaneMappings]);
+
   const timelineStart: Date = startOfDay(new Date());
   const timelineDays: number = ganttRangeDays;
   const timelineEnd: Date = addDays(timelineStart, timelineDays);
@@ -336,7 +347,14 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
       laneMap[laneName][event.sourceKey].push(event);
     });
 
-    const laneNames: string[] = Object.keys(laneMap).sort((a: string, b: string) => a.localeCompare(b));
+    const laneNames: string[] = Object.keys(laneMap).sort((a: string, b: string) => {
+      const aOrder: number = typeof laneOrderMap[a] === 'number' ? laneOrderMap[a] : 9999;
+      const bOrder: number = typeof laneOrderMap[b] === 'number' ? laneOrderMap[b] : 9999;
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      return a.localeCompare(b);
+    });
 
     return (
       <div className={styles.ganttView}>
@@ -761,10 +779,20 @@ interface IGanttTick {
 }
 
 function buildGanttTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
-  const stepDays: number = getGanttStep(timelineDays);
-  const ticks: IGanttTick[] = [];
+  if (timelineDays <= 30) {
+    return buildDailyTicks(timelineStart, timelineDays);
+  }
 
-  for (let offset = 0; offset <= timelineDays; offset += stepDays) {
+  if (timelineDays === 60 || timelineDays === 90) {
+    return buildWeeklyMondayTicks(timelineStart, timelineDays);
+  }
+
+  return buildMonthlyTicks(timelineStart, timelineDays);
+}
+
+function buildDailyTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
+  const ticks: IGanttTick[] = [];
+  for (let offset = 0; offset <= timelineDays; offset += 1) {
     const tickDate: Date = addDays(timelineStart, offset);
     ticks.push({
       key: `${tickDate.toISOString()}-${offset}`,
@@ -772,22 +800,52 @@ function buildGanttTicks(timelineStart: Date, timelineDays: number): IGanttTick[
       label: tickDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     });
   }
-
   return ticks;
 }
 
-function getGanttStep(timelineDays: number): number {
-  if (timelineDays <= 30) {
-    return 1;
-  }
-  if (timelineDays <= 60) {
-    return 2;
-  }
-  if (timelineDays <= 90) {
-    return 3;
+function buildWeeklyMondayTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
+  const ticks: IGanttTick[] = [];
+  const timelineEnd: Date = addDays(timelineStart, timelineDays);
+  for (
+    let cursor: Date = firstMondayOnOrAfter(timelineStart);
+    cursor.getTime() <= timelineEnd.getTime();
+    cursor = addDays(cursor, 7)
+  ) {
+    const offsetDays: number = dateDiffInDays(timelineStart, cursor);
+    ticks.push({
+      key: cursor.toISOString(),
+      leftPercent: (offsetDays / timelineDays) * 100,
+      label: cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    });
   }
 
-  return 5;
+  if (ticks.length === 0) {
+    ticks.push({
+      key: `fallback-${timelineStart.toISOString()}`,
+      leftPercent: 0,
+      label: timelineStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    });
+  }
+  return ticks;
+}
+
+function buildMonthlyTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
+  const ticks: IGanttTick[] = [];
+  for (let monthOffset = 0; monthOffset < 4; monthOffset += 1) {
+    const monthStart: Date = new Date(
+      timelineStart.getFullYear(),
+      timelineStart.getMonth() + monthOffset,
+      1
+    );
+    const offsetDays: number = dateDiffInDays(timelineStart, monthStart);
+    const leftPercent: number = monthOffset === 0 ? 0 : (offsetDays / timelineDays) * 100;
+    ticks.push({
+      key: monthStart.toISOString(),
+      leftPercent: Math.max(0, leftPercent),
+      label: monthStart.toLocaleDateString(undefined, { month: 'long' })
+    });
+  }
+  return ticks;
 }
 
 function renderEventTooltip(event: ICalendarEvent): JSX.Element {
@@ -830,6 +888,13 @@ function startOfMonth(date: Date): Date {
 function startOfWeek(date: Date): Date {
   const dayStart: Date = startOfDay(date);
   return addDays(dayStart, -dayStart.getDay());
+}
+
+function firstMondayOnOrAfter(date: Date): Date {
+  const dayStart: Date = startOfDay(date);
+  const dayOfWeek: number = dayStart.getDay();
+  const daysUntilMonday: number = dayOfWeek === 1 ? 0 : ((8 - dayOfWeek) % 7);
+  return addDays(dayStart, daysUntilMonday);
 }
 
 function addHours(date: Date, hours: number): Date {
@@ -972,14 +1037,28 @@ function parseSwimLaneMappings(rawMappings: string): ISwimLaneDefinition[] {
     .split('\n')
     .map((line: string) => line.trim())
     .filter((line: string) => line.length > 0)
-    .forEach((line: string) => {
+    .forEach((line: string, index: number) => {
       const parts: string[] = line.split('|').map((part: string) => part.trim());
       if (parts.length < 2) {
         return;
       }
 
-      const laneName: string = parts[0];
-      const calendarsRaw: string = parts[1];
+      let order: number = index + 1;
+      let laneName: string = '';
+      let calendarsRaw: string = '';
+      if (parts.length >= 3 && /^\d+$/.test(parts[0])) {
+        order = parseInt(parts[0], 10);
+        laneName = parts[1];
+        calendarsRaw = parts[2];
+      } else if (parts.length >= 3 && /^\d+$/.test(parts[1])) {
+        laneName = parts[0];
+        order = parseInt(parts[1], 10);
+        calendarsRaw = parts[2];
+      } else {
+        laneName = parts[0];
+        calendarsRaw = parts[1];
+      }
+
       if (!laneName || !calendarsRaw) {
         return;
       }
@@ -994,6 +1073,7 @@ function parseSwimLaneMappings(rawMappings: string): ISwimLaneDefinition[] {
       }
 
       definitions.push({
+        order,
         laneName,
         calendarNames
       });

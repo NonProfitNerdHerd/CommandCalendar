@@ -48,14 +48,14 @@ Only `siteUrl|calendarListTitle` is required. `Display Name` and `Staff Group` a
 Optional advanced mapping for Gantt swim lanes:
 
 ```text
-Lane Name|Calendar Display Name,Another Calendar
+Order|Lane Name|Calendar Display Name,Another Calendar
 ```
 
 Example:
 
 ```text
-G1|Command Site,Ops
-G2|Projects
+1|G1|Command Site,Ops
+2|G2|Projects
 ```
 
 Optional category coloring:

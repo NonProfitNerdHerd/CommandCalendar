@@ -9,7 +9,7 @@ define([], function() {
     "CalendarSourcesFieldLabel": "Calendar sources",
     "CalendarSourcesFieldDescription": "One source per line: siteUrl|calendarListTitle|Display Name|Staff Group",
     "SwimLaneMappingsFieldLabel": "Gantt swim lane mappings",
-    "SwimLaneMappingsFieldDescription": "One lane per line: Lane Name|Calendar Display Name,Another Calendar",
+    "SwimLaneMappingsFieldDescription": "One lane per line: Order|Lane Name|Calendar Display Name,Another Calendar",
     "CategoryColorMappingsFieldLabel": "Category color mappings",
     "CategoryColorMappingsFieldDescription": "One per line: Category|#Color"
   }
