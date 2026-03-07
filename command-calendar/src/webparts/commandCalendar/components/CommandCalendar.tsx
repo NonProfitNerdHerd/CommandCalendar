@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   DefaultButton,
+  DirectionalHint,
   Dropdown,
   IDropdownOption,
   MessageBar,
@@ -8,7 +9,8 @@ import {
   Pivot,
   PivotItem,
   Spinner,
-  SpinnerSize
+  SpinnerSize,
+  TooltipHost
 } from '@fluentui/react';
 import styles from './CommandCalendar.module.scss';
 import type { ICommandCalendarProps } from './ICommandCalendarProps';
@@ -16,6 +18,7 @@ import { ICalendarEvent, ICalendarSourceConfig } from '../models/CalendarModels'
 import { CalendarDataService, parseCalendarSources } from '../services/CalendarDataService';
 
 const DAY_LABELS: string[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const GANTT_ZOOM_ORDER: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
 
 const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalendarProps) => {
   const [events, setEvents] = React.useState<ICalendarEvent[]>([]);
@@ -25,6 +28,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   const [activeView, setActiveView] = React.useState<string>('gantt');
   const [calendarAnchor, setCalendarAnchor] = React.useState<Date>(startOfMonth(new Date()));
   const [reloadToken, setReloadToken] = React.useState<number>(0);
+  const [ganttZoomIndex, setGanttZoomIndex] = React.useState<number>(1);
 
   const dataService: CalendarDataService = React.useMemo(
     () => new CalendarDataService(props.spHttpClient),
@@ -122,9 +126,18 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     );
   }, [events, selectedCategories]);
 
-  const timelineStart: Date = React.useMemo(() => startOfDay(new Date()), []);
-  const timelineDays: number = Math.max(120, props.lookAheadDays);
+  const zoomKey: 'day' | 'week' | 'month' = GANTT_ZOOM_ORDER[ganttZoomIndex];
+  const baseSpanDays: number = Math.max(30, props.lookAheadDays + Math.max(0, props.lookBackDays));
+  const timelineStart: Date = React.useMemo(
+    () => addDays(startOfDay(new Date()), -Math.max(0, props.lookBackDays)),
+    [props.lookBackDays]
+  );
+  const timelineDays: number = getTimelineSpanDays(zoomKey, baseSpanDays);
   const timelineEnd: Date = addDays(timelineStart, timelineDays);
+  const ganttTicks: IGanttTick[] = React.useMemo(
+    () => buildGanttTicks(timelineStart, timelineDays, zoomKey),
+    [timelineDays, timelineStart, zoomKey]
+  );
 
   const monthGridDates: Date[] = React.useMemo(() => {
     const monthStart: Date = startOfMonth(calendarAnchor);
@@ -155,6 +168,29 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     });
   };
 
+  const onGanttWheel = (ev: React.WheelEvent<HTMLDivElement>): void => {
+    if (Math.abs(ev.deltaY) < 4) {
+      return;
+    }
+
+    ev.preventDefault();
+    setGanttZoomIndex((currentIndex: number) => {
+      if (ev.deltaY < 0) {
+        return Math.max(0, currentIndex - 1);
+      }
+
+      return Math.min(GANTT_ZOOM_ORDER.length - 1, currentIndex + 1);
+    });
+  };
+
+  const onEventClick = (event: ICalendarEvent): void => {
+    if (!event.itemUrl) {
+      return;
+    }
+
+    window.open(event.itemUrl, '_blank');
+  };
+
   const renderGanttView = (): JSX.Element => {
     const visibleEvents: ICalendarEvent[] = filteredEvents.filter((event: ICalendarEvent) =>
       rangesOverlap(event.start, event.end, timelineStart, timelineEnd)
@@ -165,11 +201,41 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     }
 
     return (
-      <div className={styles.ganttView}>
+      <div className={styles.ganttView} onWheel={onGanttWheel}>
+        <div className={styles.ganttToolbar}>
+          <div className={styles.ganttRangeSummary}>
+            {formatDate(timelineStart)} - {formatDate(timelineEnd)}
+          </div>
+          <div className={styles.ganttZoomLegend}>
+            Scroll over the chart to zoom ({zoomKey})
+          </div>
+          <div className={styles.ganttZoomButtons}>
+            {GANTT_ZOOM_ORDER.map((option: 'day' | 'week' | 'month', index: number) => (
+              <button
+                type="button"
+                key={option}
+                className={`${styles.ganttZoomButton} ${
+                  index === ganttZoomIndex ? styles.ganttZoomButtonActive : ''
+                }`}
+                onClick={() => setGanttZoomIndex(index)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className={styles.ganttHeader}>
           <div className={styles.ganttEventColumn}>Event</div>
-          <div className={styles.ganttTimelineColumn}>
-            {formatDate(timelineStart)} - {formatDate(timelineEnd)}
+          <div className={styles.ganttTimelineColumn}>Timeline</div>
+        </div>
+        <div className={styles.ganttAxisRow}>
+          <div />
+          <div className={styles.ganttAxisTrack}>
+            {ganttTicks.map((tick: IGanttTick) => (
+              <div key={tick.key} className={styles.ganttTick} style={{ left: `${tick.leftPercent}%` }}>
+                <span className={styles.ganttTickLabel}>{tick.label}</span>
+              </div>
+            ))}
           </div>
         </div>
         {visibleEvents.map((event: ICalendarEvent) => {
@@ -179,6 +245,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
           const durationDays: number = Math.max(1, dateDiffInDays(clampedStart, clampedEnd) + 1);
           const leftPercent: number = (startOffsetDays / timelineDays) * 100;
           const widthPercent: number = Math.max((durationDays / timelineDays) * 100, 1);
+          const tooltipContent: JSX.Element = renderEventTooltip(event);
 
           return (
             <div className={styles.ganttRow} key={event.id}>
@@ -190,14 +257,41 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
                 <span className={styles.eventTime}>{formatDateRange(event.start, event.end)}</span>
               </div>
               <div className={styles.ganttTrack}>
-                <div
-                  className={styles.ganttBar}
-                  style={{
-                    left: `${leftPercent}%`,
-                    width: `${widthPercent}%`,
-                    backgroundColor: event.sourceColor
-                  }}
-                />
+                {event.isRecurringInstance ? (
+                  <TooltipHost
+                    content={tooltipContent}
+                    directionalHint={DirectionalHint.bottomCenter}
+                  >
+                    <button
+                      type="button"
+                      className={styles.ganttDotButton}
+                      onClick={() => onEventClick(event)}
+                      style={{
+                        left: `${leftPercent}%`,
+                        borderColor: event.sourceColor,
+                        backgroundColor: event.sourceColor
+                      }}
+                      title={event.title}
+                    />
+                  </TooltipHost>
+                ) : (
+                  <TooltipHost
+                    content={tooltipContent}
+                    directionalHint={DirectionalHint.bottomCenter}
+                  >
+                    <button
+                      type="button"
+                      className={styles.ganttBarButton}
+                      onClick={() => onEventClick(event)}
+                      style={{
+                        left: `${leftPercent}%`,
+                        width: `${widthPercent}%`,
+                        backgroundColor: event.sourceColor
+                      }}
+                      title={event.title}
+                    />
+                  </TooltipHost>
+                )}
               </div>
             </div>
           );
@@ -244,10 +338,24 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
                 <div className={styles.calendarDate}>{gridDate.getDate()}</div>
                 <div className={styles.calendarItems}>
                   {dayEvents.slice(0, 3).map((event: ICalendarEvent) => (
-                    <div className={styles.calendarItem} key={`${event.id}-${gridDate.toISOString()}`}>
-                      <span className={styles.calendarItemDot} style={{ backgroundColor: event.sourceColor }} />
-                      <span className={styles.calendarItemText}>{event.title}</span>
-                    </div>
+                    <TooltipHost
+                      key={`${event.id}-${gridDate.toISOString()}`}
+                      content={renderEventTooltip(event)}
+                      directionalHint={DirectionalHint.bottomLeftEdge}
+                    >
+                      <button
+                        type="button"
+                        className={styles.calendarItemButton}
+                        onClick={() => onEventClick(event)}
+                        title={event.title}
+                      >
+                        <span
+                          className={styles.calendarItemDot}
+                          style={{ backgroundColor: event.sourceColor }}
+                        />
+                        <span className={styles.calendarItemText}>{event.title}</span>
+                      </button>
+                    </TooltipHost>
                   ))}
                   {dayEvents.length > 3 && (
                     <div className={styles.moreItems}>+{dayEvents.length - 3} more</div>
@@ -377,6 +485,116 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   );
 };
 
+interface IGanttTick {
+  key: string;
+  leftPercent: number;
+  label: string;
+}
+
+function getTimelineSpanDays(zoomKey: 'day' | 'week' | 'month', baseSpanDays: number): number {
+  if (zoomKey === 'day') {
+    return Math.max(28, Math.floor(baseSpanDays * 0.6));
+  }
+
+  if (zoomKey === 'month') {
+    return Math.max(180, Math.floor(baseSpanDays * 2));
+  }
+
+  return Math.max(90, baseSpanDays);
+}
+
+function buildGanttTicks(
+  timelineStart: Date,
+  timelineDays: number,
+  zoomKey: 'day' | 'week' | 'month'
+): IGanttTick[] {
+  if (zoomKey === 'month') {
+    return buildMonthTicks(timelineStart, timelineDays);
+  }
+
+  const stepDays: number = zoomKey === 'week' ? 7 : getDayStep(timelineDays);
+  const ticks: IGanttTick[] = [];
+
+  for (let offset = 0; offset <= timelineDays; offset += stepDays) {
+    const tickDate: Date = addDays(timelineStart, offset);
+    ticks.push({
+      key: `${tickDate.toISOString()}-${offset}`,
+      leftPercent: (offset / timelineDays) * 100,
+      label:
+        zoomKey === 'week'
+          ? `Wk ${getWeekNumber(tickDate)}`
+          : tickDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    });
+  }
+
+  return ticks;
+}
+
+function buildMonthTicks(timelineStart: Date, timelineDays: number): IGanttTick[] {
+  const ticks: IGanttTick[] = [];
+  const timelineEnd: Date = addDays(timelineStart, timelineDays);
+  let cursor: Date = new Date(timelineStart.getFullYear(), timelineStart.getMonth(), 1);
+
+  if (cursor.getTime() < timelineStart.getTime()) {
+    cursor = addMonths(cursor, 1);
+  }
+
+  while (cursor.getTime() <= timelineEnd.getTime()) {
+    const offsetDays: number = dateDiffInDays(timelineStart, cursor);
+    ticks.push({
+      key: cursor.toISOString(),
+      leftPercent: Math.max(0, (offsetDays / timelineDays) * 100),
+      label: cursor.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+    });
+    cursor = addMonths(cursor, 1);
+  }
+
+  if (ticks.length === 0) {
+    ticks.push({
+      key: timelineStart.toISOString(),
+      leftPercent: 0,
+      label: timelineStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    });
+  }
+
+  return ticks;
+}
+
+function getDayStep(timelineDays: number): number {
+  if (timelineDays <= 35) {
+    return 1;
+  }
+  if (timelineDays <= 70) {
+    return 2;
+  }
+  if (timelineDays <= 120) {
+    return 5;
+  }
+
+  return 10;
+}
+
+function getWeekNumber(date: Date): number {
+  const utcDate: Date = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum: number = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
+  const yearStart: Date = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+function renderEventTooltip(event: ICalendarEvent): JSX.Element {
+  return (
+    <div className={styles.eventTooltip}>
+      <div className={styles.tooltipTitle}>{event.title}</div>
+      <div><strong>Category:</strong> {event.categories.join(', ')}</div>
+      <div><strong>Start:</strong> {formatDateTime(event.start, event.isAllDay)}</div>
+      <div><strong>End:</strong> {formatDateTime(event.end, event.isAllDay)}</div>
+      <div><strong>Description:</strong> {event.description || 'N/A'}</div>
+      {event.itemUrl && <div className={styles.tooltipHint}>Click to open item</div>}
+    </div>
+  );
+}
+
 function addDays(date: Date, days: number): Date {
   const nextDate: Date = new Date(date.getTime());
   nextDate.setDate(nextDate.getDate() + days);
@@ -434,6 +652,20 @@ function formatDate(date: Date): string {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
+  });
+}
+
+function formatDateTime(date: Date, isAllDay: boolean): string {
+  if (isAllDay) {
+    return `${formatDate(date)} (All day)`;
+  }
+
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
   });
 }
 

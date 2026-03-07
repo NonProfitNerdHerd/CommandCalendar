@@ -15,6 +15,8 @@ export interface ICalendarEvent {
   sourceKey: string;
   sourceName: string;
   sourceColor: string;
+  itemUrl?: string;
+  isRecurringInstance?: boolean;
   location?: string;
   description?: string;
   isAllDay: boolean;

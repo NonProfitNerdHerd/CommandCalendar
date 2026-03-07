@@ -65,11 +65,48 @@
   margin-top: 8px;
 }
 
+.ganttToolbar {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(210px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ganttRangeSummary {
+  font-size: 13px;
+  color: #323130;
+}
+
+.ganttZoomLegend {
+  font-size: 12px;
+  color: #605e5c;
+}
+
+.ganttZoomButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.ganttZoomButton {
+  border: 1px solid #c8c6c4;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 2px 10px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.ganttZoomButtonActive {
+  border-color: #0078d4;
+  color: #0078d4;
+  font-weight: 600;
+}
+
 .ganttHeader {
   display: grid;
   grid-template-columns: minmax(240px, 1.2fr) minmax(420px, 3fr);
   gap: 12px;
-  border-bottom: 1px solid #edebe9;
   padding: 8px 0;
   font-weight: 600;
   color: #323130;
@@ -118,18 +155,63 @@
 
 .ganttTrack {
   position: relative;
-  height: 18px;
+  height: 20px;
   border-radius: 8px;
   background: #f3f2f1;
   overflow: hidden;
 }
 
-.ganttBar {
+.ganttAxisRow {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(420px, 3fr);
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.ganttAxisTrack {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background: #faf9f8;
+  border: 1px solid #f3f2f1;
+}
+
+.ganttTick {
   position: absolute;
-  top: 1px;
-  bottom: 1px;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid #d2d0ce;
+}
+
+.ganttTickLabel {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+  font-size: 10px;
+  color: #605e5c;
+  white-space: nowrap;
+}
+
+.ganttBarButton {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border: 0;
   border-radius: 8px;
-  opacity: 0.9;
+  opacity: 0.95;
+  cursor: pointer;
+}
+
+.ganttDotButton {
+  position: absolute;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  border: 1px solid;
+  cursor: pointer;
 }
 
 .calendarView {
@@ -196,6 +278,20 @@
   gap: 5px;
   font-size: 11px;
   line-height: 1.2;
+}
+
+.calendarItemButton {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
 }
 
 .calendarItemDot {
@@ -279,6 +375,23 @@
   border-radius: 6px;
 }
 
+.eventTooltip {
+  max-width: 320px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tooltipTitle {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.tooltipHint {
+  margin-top: 6px;
+  color: #0078d4;
+  font-weight: 600;
+}
+
 @media (max-width: 1180px) {
   .quadView {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -286,7 +399,12 @@
 }
 
 @media (max-width: 900px) {
+  .ganttToolbar {
+    grid-template-columns: 1fr;
+  }
+
   .ganttHeader,
+  .ganttAxisRow,
   .ganttRow {
     grid-template-columns: 1fr;
   }
