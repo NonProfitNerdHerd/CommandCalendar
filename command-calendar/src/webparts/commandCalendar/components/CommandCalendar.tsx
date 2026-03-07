@@ -20,7 +20,34 @@ import { CalendarDataService, parseCalendarSources } from '../services/CalendarD
 const DAY_LABELS: string[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const GANTT_RANGE_OPTIONS: number[] = [30, 60, 90, 120];
 const HOUR_SLOTS: number[] = Array.from({ length: 24 }, (_: unknown, index: number) => index);
+const DEFAULT_CATEGORY_COLORS: string[] = [
+  '#0078d4',
+  '#107c10',
+  '#d83b01',
+  '#5c2d91',
+  '#c239b3',
+  '#0099bc',
+  '#8764b8',
+  '#038387'
+];
 type CalendarMode = 'day' | 'week' | 'month';
+interface IHorizonBlock {
+  label: string;
+  startOffsetDays: number;
+  endOffsetDays: number;
+}
+interface ICategoryLegendItem {
+  key: string;
+  label: string;
+  color: string;
+}
+
+const HORIZON_BLOCKS: IHorizonBlock[] = [
+  { label: 'Next 30 Days', startOffsetDays: 0, endOffsetDays: 30 },
+  { label: 'Days 31-60', startOffsetDays: 31, endOffsetDays: 60 },
+  { label: 'Days 61-90', startOffsetDays: 61, endOffsetDays: 90 },
+  { label: 'Days 91-120', startOffsetDays: 91, endOffsetDays: 120 }
+];
 
 const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalendarProps) => {
   const [events, setEvents] = React.useState<ICalendarEvent[]>([]);
@@ -129,6 +156,55 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     );
   }, [events, selectedCategories]);
 
+  const categoryColorMap: Record<string, string> = React.useMemo(() => {
+    const configuredMap: Record<string, string> = parseCategoryColors(props.categoryColorMappings || '');
+    const categoryKeyToDisplayName: Record<string, string> = {};
+    events.forEach((event: ICalendarEvent) => {
+      event.categories.forEach((category: string) => {
+        const normalized: string = normalizeCategoryKey(category);
+        if (!categoryKeyToDisplayName[normalized]) {
+          categoryKeyToDisplayName[normalized] = category;
+        }
+      });
+    });
+
+    Object.keys(categoryKeyToDisplayName).forEach((categoryKey: string, index: number) => {
+      if (!configuredMap[categoryKey]) {
+        configuredMap[categoryKey] = DEFAULT_CATEGORY_COLORS[index % DEFAULT_CATEGORY_COLORS.length];
+      }
+    });
+
+    return configuredMap;
+  }, [events, props.categoryColorMappings]);
+
+  const categoryLegendItems: ICategoryLegendItem[] = React.useMemo(() => {
+    const categoryDisplayMap: Record<string, string> = {};
+    events.forEach((event: ICalendarEvent) => {
+      event.categories.forEach((category: string) => {
+        const normalized: string = normalizeCategoryKey(category);
+        if (!categoryDisplayMap[normalized]) {
+          categoryDisplayMap[normalized] = category;
+        }
+      });
+    });
+
+    return Object.keys(categoryDisplayMap)
+      .sort((a: string, b: string) => categoryDisplayMap[a].localeCompare(categoryDisplayMap[b]))
+      .map((key: string) => ({
+        key,
+        label: categoryDisplayMap[key],
+        color: categoryColorMap[key] || '#605e5c'
+      }));
+  }, [categoryColorMap, events]);
+
+  const sourceByKey: Record<string, ICalendarSourceConfig> = React.useMemo(() => {
+    const lookup: Record<string, ICalendarSourceConfig> = {};
+    parsedSources.sources.forEach((source: ICalendarSourceConfig) => {
+      lookup[source.key] = source;
+    });
+    return lookup;
+  }, [parsedSources.sources]);
+
   const timelineStart: Date = startOfDay(new Date());
   const timelineDays: number = ganttRangeDays;
   const timelineEnd: Date = addDays(timelineStart, timelineDays);
@@ -200,6 +276,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     className: string,
     showDot: boolean
   ): JSX.Element => {
+    const eventColor: string = getEventColor(event, categoryColorMap);
     return (
       <TooltipHost
         content={renderEventTooltip(event)}
@@ -214,7 +291,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
           {showDot && (
             <span
               className={styles.calendarItemDot}
-              style={{ backgroundColor: event.sourceColor }}
+              style={{ backgroundColor: eventColor }}
             />
           )}
           <span className={styles.calendarItemText}>{event.title}</span>
@@ -231,6 +308,21 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     if (visibleEvents.length === 0) {
       return <div className={styles.emptyState}>No events in the current timeline window.</div>;
     }
+
+    const laneMap: Record<string, Record<string, ICalendarEvent[]>> = {};
+    visibleEvents.forEach((event: ICalendarEvent) => {
+      const source: ICalendarSourceConfig | undefined = sourceByKey[event.sourceKey];
+      const laneName: string = source ? source.staffGroup : 'General';
+      if (!laneMap[laneName]) {
+        laneMap[laneName] = {};
+      }
+      if (!laneMap[laneName][event.sourceKey]) {
+        laneMap[laneName][event.sourceKey] = [];
+      }
+      laneMap[laneName][event.sourceKey].push(event);
+    });
+
+    const laneNames: string[] = Object.keys(laneMap).sort((a: string, b: string) => a.localeCompare(b));
 
     return (
       <div className={styles.ganttView}>
@@ -257,7 +349,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
           </div>
         </div>
         <div className={styles.ganttHeader}>
-          <div className={styles.ganttEventColumn}>Event</div>
+          <div className={styles.ganttEventColumn}>Staff / Calendar</div>
           <div className={styles.ganttTimelineColumn}>Timeline</div>
         </div>
         <div className={styles.ganttAxisRow}>
@@ -270,61 +362,84 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
             ))}
           </div>
         </div>
-        {visibleEvents.map((event: ICalendarEvent) => {
-          const clampedStart: Date = maxDate(event.start, timelineStart);
-          const clampedEnd: Date = minDate(event.end, timelineEnd);
-          const startOffsetDays: number = dateDiffInDays(timelineStart, clampedStart);
-          const durationDays: number = Math.max(1, dateDiffInDays(clampedStart, clampedEnd) + 1);
-          const leftPercent: number = (startOffsetDays / timelineDays) * 100;
-          const widthPercent: number = Math.max((durationDays / timelineDays) * 100, 1);
-          const tooltipContent: JSX.Element = renderEventTooltip(event);
+        {laneNames.map((laneName: string) => {
+          const sourceKeys: string[] = Object.keys(laneMap[laneName]).sort((a: string, b: string) => {
+            const aName: string = sourceByKey[a] ? sourceByKey[a].displayName : a;
+            const bName: string = sourceByKey[b] ? sourceByKey[b].displayName : b;
+            return aName.localeCompare(bName);
+          });
 
           return (
-            <div className={styles.ganttRow} key={event.id}>
-              <div className={styles.ganttEventMeta}>
-                <span className={styles.eventTitle}>{event.title}</span>
-                <span className={styles.sourcePill} style={{ borderColor: event.sourceColor }}>
-                  {event.sourceName}
-                </span>
-                <span className={styles.eventTime}>{formatDateRange(event.start, event.end)}</span>
-              </div>
-              <div className={styles.ganttTrack}>
-                {event.isRecurringInstance ? (
-                  <TooltipHost
-                    content={tooltipContent}
-                    directionalHint={DirectionalHint.bottomCenter}
-                  >
-                    <button
-                      type="button"
-                      className={styles.ganttDotButton}
-                      onClick={() => onEventClick(event)}
-                      style={{
-                        left: `${leftPercent}%`,
-                        borderColor: event.sourceColor,
-                        backgroundColor: event.sourceColor
-                      }}
-                      title={event.title}
-                    />
-                  </TooltipHost>
-                ) : (
-                  <TooltipHost
-                    content={tooltipContent}
-                    directionalHint={DirectionalHint.bottomCenter}
-                  >
-                    <button
-                      type="button"
-                      className={styles.ganttBarButton}
-                      onClick={() => onEventClick(event)}
-                      style={{
-                        left: `${leftPercent}%`,
-                        width: `${widthPercent}%`,
-                        backgroundColor: event.sourceColor
-                      }}
-                      title={event.title}
-                    />
-                  </TooltipHost>
-                )}
-              </div>
+            <div className={styles.swimLaneSection} key={laneName}>
+              <div className={styles.swimLaneHeader}>{laneName}</div>
+              {sourceKeys.map((sourceKey: string) => {
+                const sourceEvents: ICalendarEvent[] = laneMap[laneName][sourceKey]
+                  .slice()
+                  .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+                const sourceName: string = sourceByKey[sourceKey]
+                  ? sourceByKey[sourceKey].displayName
+                  : sourceKey;
+
+                return (
+                  <div className={styles.ganttRow} key={`${laneName}-${sourceKey}`}>
+                    <div className={styles.ganttRowLabel}>{sourceName}</div>
+                    <div className={styles.ganttTrack}>
+                      {sourceEvents.map((event: ICalendarEvent) => {
+                        const clampedStart: Date = maxDate(event.start, timelineStart);
+                        const clampedEnd: Date = minDate(event.end, timelineEnd);
+                        const startOffsetDays: number = dateDiffInDays(timelineStart, clampedStart);
+                        const durationDays: number = Math.max(1, dateDiffInDays(clampedStart, clampedEnd) + 1);
+                        const leftPercent: number = (startOffsetDays / timelineDays) * 100;
+                        const widthPercent: number = Math.max((durationDays / timelineDays) * 100, 1);
+                        const tooltipContent: JSX.Element = renderEventTooltip(event);
+                        const eventColor: string = getEventColor(event, categoryColorMap);
+
+                        if (event.isRecurringInstance) {
+                          return (
+                            <TooltipHost
+                              key={event.id}
+                              content={tooltipContent}
+                              directionalHint={DirectionalHint.bottomCenter}
+                            >
+                              <button
+                                type="button"
+                                className={styles.ganttDotButton}
+                                onClick={() => onEventClick(event)}
+                                style={{
+                                  left: `${leftPercent}%`,
+                                  borderColor: eventColor,
+                                  backgroundColor: eventColor
+                                }}
+                                title={event.title}
+                              />
+                            </TooltipHost>
+                          );
+                        }
+
+                        return (
+                          <TooltipHost
+                            key={event.id}
+                            content={tooltipContent}
+                            directionalHint={DirectionalHint.bottomCenter}
+                          >
+                            <button
+                              type="button"
+                              className={styles.ganttBarButton}
+                              onClick={() => onEventClick(event)}
+                              style={{
+                                left: `${leftPercent}%`,
+                                width: `${widthPercent}%`,
+                                backgroundColor: eventColor
+                              }}
+                              title={event.title}
+                            />
+                          </TooltipHost>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -516,26 +631,27 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   };
 
   const renderHorizonView = (): JSX.Element => {
-    const horizons: number[] = [30, 60, 90, 120];
     const today: Date = startOfDay(new Date());
 
     return (
       <div className={styles.quadView}>
-        {horizons.map((days: number) => {
-          const horizonEnd: Date = addDays(endOfDay(today), days);
+        {HORIZON_BLOCKS.map((block: IHorizonBlock) => {
+          const horizonStart: Date = addDays(startOfDay(today), block.startOffsetDays);
+          const horizonEnd: Date = addDays(endOfDay(today), block.endOffsetDays);
           const horizonEvents: ICalendarEvent[] = filteredEvents
             .filter((event: ICalendarEvent) =>
-              rangesOverlap(event.start, event.end, today, horizonEnd)
+              event.start.getTime() >= horizonStart.getTime() &&
+              event.start.getTime() <= horizonEnd.getTime()
             )
             .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
 
           return (
-            <div className={styles.quadCard} key={days}>
-              <div className={styles.quadHeader}>Next {days} Days</div>
+            <div className={styles.quadCard} key={block.label}>
+              <div className={styles.quadHeader}>{block.label}</div>
               <div className={styles.quadCount}>{horizonEvents.length}</div>
               <div className={styles.quadList}>
                 {horizonEvents.slice(0, 5).map((event: ICalendarEvent) => (
-                  <div className={styles.quadItem} key={`${days}-${event.id}`}>
+                  <div className={styles.quadItem} key={`${block.label}-${event.id}`}>
                     <span className={styles.quadItemTitle}>{event.title}</span>
                     <span className={styles.quadItemMeta}>
                       {formatDateRange(event.start, event.end)} | {event.sourceName}
@@ -579,15 +695,15 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
         <MessageBar messageBarType={MessageBarType.info}>
           Configure one or more calendar sources in the property pane using:
           <br />
-          siteUrl|calendarListTitle|Display Name|#Color
+          siteUrl|calendarListTitle|Display Name|Staff Group
         </MessageBar>
       )}
 
       <div className={styles.sourcesLegend}>
-        {parsedSources.sources.map((source: ICalendarSourceConfig) => (
-          <span className={styles.sourceLegendItem} key={source.key}>
-            <span className={styles.sourceLegendDot} style={{ backgroundColor: source.color }} />
-            {source.displayName}
+        {categoryLegendItems.map((legendItem: ICategoryLegendItem) => (
+          <span className={styles.sourceLegendItem} key={legendItem.key}>
+            <span className={styles.sourceLegendDot} style={{ backgroundColor: legendItem.color }} />
+            {legendItem.label}
           </span>
         ))}
       </div>
@@ -800,6 +916,38 @@ function getCalendarTitle(calendarDate: Date, mode: CalendarMode): string {
 
 function isEventStartingInSlot(event: ICalendarEvent, slotStart: Date, slotEnd: Date): boolean {
   return event.start.getTime() >= slotStart.getTime() && event.start.getTime() < slotEnd.getTime();
+}
+
+function parseCategoryColors(rawMappings: string): Record<string, string> {
+  const mapping: Record<string, string> = {};
+  rawMappings
+    .split('\n')
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0)
+    .forEach((line: string) => {
+      const parts: string[] = line.split('|').map((part: string) => part.trim());
+      if (parts.length < 2) {
+        return;
+      }
+      const categoryName: string = parts[0];
+      const color: string = parts[1];
+      if (!categoryName || !/^#?[0-9a-f]{6}$/i.test(color)) {
+        return;
+      }
+      const normalizedColor: string = color.charAt(0) === '#' ? color : `#${color}`;
+      mapping[normalizeCategoryKey(categoryName)] = normalizedColor;
+    });
+  return mapping;
+}
+
+function normalizeCategoryKey(category: string): string {
+  return category.toLocaleLowerCase().trim();
+}
+
+function getEventColor(event: ICalendarEvent, categoryColorMap: Record<string, string>): string {
+  const firstCategory: string = event.categories.length > 0 ? event.categories[0] : 'uncategorized';
+  const mappedColor: string = categoryColorMap[normalizeCategoryKey(firstCategory)];
+  return mappedColor || '#605e5c';
 }
 
 export default CommandCalendar;

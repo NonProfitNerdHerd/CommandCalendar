@@ -7,6 +7,8 @@ define([], function() {
     "LookBackDaysFieldLabel": "Days to load in the past",
     "LookAheadDaysFieldLabel": "Days to load in the future",
     "CalendarSourcesFieldLabel": "Calendar sources",
-    "CalendarSourcesFieldDescription": "One source per line: siteUrl|calendarListTitle|Display Name|#Color"
+    "CalendarSourcesFieldDescription": "One source per line: siteUrl|calendarListTitle|Display Name|Staff Group",
+    "CategoryColorMappingsFieldLabel": "Category color mappings",
+    "CategoryColorMappingsFieldDescription": "One per line: Category|#Color"
   }
 });

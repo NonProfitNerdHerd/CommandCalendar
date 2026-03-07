@@ -34,7 +34,12 @@ export function parseCalendarSources(calendarSources: string): ICalendarSourcePa
     const siteUrl: string = parts[0];
     const listTitle: string = parts[1];
     const displayName: string = parts[2] || listTitle;
-    const color: string = parts[3] || SOURCE_COLORS[index % SOURCE_COLORS.length];
+    const potentialFourth: string = parts[3] || '';
+    const potentialFifth: string = parts[4] || '';
+    const color: string = /^#/i.test(potentialFourth)
+      ? potentialFourth
+      : SOURCE_COLORS[index % SOURCE_COLORS.length];
+    const staffGroup: string = potentialFifth || (/^#/i.test(potentialFourth) ? 'General' : (potentialFourth || 'General'));
 
     if (!/^https?:\/\//i.test(siteUrl)) {
       errors.push(`Line ${index + 1} has an invalid site URL: "${siteUrl}".`);
@@ -46,6 +51,7 @@ export function parseCalendarSources(calendarSources: string): ICalendarSourcePa
       siteUrl: siteUrl.replace(/\/$/, ''),
       listTitle,
       displayName,
+      staffGroup,
       color
     });
   });
@@ -69,8 +75,21 @@ export class CalendarDataService {
       )
     );
 
-    return eventsPerSource
+    const mergedEvents: ICalendarEvent[] = eventsPerSource
       .reduce((all: ICalendarEvent[], sourceEvents: ICalendarEvent[]) => all.concat(sourceEvents), [])
+      .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
+
+    const dedupedByKey: Record<string, ICalendarEvent> = {};
+    mergedEvents.forEach((event: ICalendarEvent) => {
+      const dedupeKey: string =
+        `${event.sourceKey}|${event.title}|${event.start.toISOString()}|${event.end.toISOString()}|${event.itemUrl || ''}`;
+      if (!dedupedByKey[dedupeKey]) {
+        dedupedByKey[dedupeKey] = event;
+      }
+    });
+
+    return Object.keys(dedupedByKey)
+      .map((key: string) => dedupedByKey[key])
       .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
   }
 
@@ -82,7 +101,7 @@ export class CalendarDataService {
     const displayFormUrl: string = await this._getDisplayFormUrl(source);
     const escapedListTitle: string = source.listTitle.replace(/'/g, "''");
     const query: string =
-      '$select=Id,Title,EventDate,EndDate,Category,Location,Description,fAllDayEvent,fRecurrence,RecurrenceData,RecurrenceID&' +
+      '$select=Id,Title,EventDate,EndDate,Duration,Category,Location,Description,fAllDayEvent,fRecurrence,RecurrenceData,RecurrenceID&' +
       '$orderby=EventDate asc&$top=5000';
 
     let requestUrl: string =
@@ -304,7 +323,11 @@ export class CalendarDataService {
     const fallbackStart: Date = new Date(String(item.EventDate || ''));
     const fallbackEnd: Date = new Date(String(item.EndDate || ''));
     const start: Date = occurrenceStart || fallbackStart;
-    const end: Date = occurrenceEnd || fallbackEnd;
+    const durationOverrideMs: number | undefined = this._getDurationMsFromItem(item);
+    let end: Date = occurrenceEnd || fallbackEnd;
+    if (durationOverrideMs && (!occurrenceEnd || end.getTime() < start.getTime())) {
+      end = new Date(start.getTime() + durationOverrideMs);
+    }
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return undefined;
@@ -320,7 +343,7 @@ export class CalendarDataService {
       id: eventId,
       title: String(item.Title || '(Untitled Event)'),
       start,
-      end: end.getTime() >= start.getTime() ? end : start,
+      end: end.getTime() >= start.getTime() ? end : new Date(start.getTime() + 60 * 60 * 1000),
       categories,
       sourceKey: source.key,
       sourceName: source.displayName,
@@ -363,7 +386,12 @@ export class CalendarDataService {
       return [];
     }
 
-    const durationMs: number = Math.max(1, baseEvent.end.getTime() - baseEvent.start.getTime());
+    const durationFromItemMs: number | undefined = this._getDurationMsFromItem(item);
+    const fallbackDurationMs: number = Math.max(1, baseEvent.end.getTime() - baseEvent.start.getTime());
+    const durationMs: number = durationFromItemMs || this._normalizeRecurringDuration(
+      fallbackDurationMs,
+      baseEvent.isAllDay
+    );
     const seriesEndByRule: Date = parsedRule.windowEnd || rangeEnd;
     const seriesEnd: Date =
       seriesEndByRule.getTime() < rangeEnd.getTime() ? seriesEndByRule : rangeEnd;
@@ -408,6 +436,32 @@ export class CalendarDataService {
     }
 
     return occurrences;
+  }
+
+  private _getDurationMsFromItem(item: Record<string, unknown>): number | undefined {
+    const rawDuration: unknown = item.Duration;
+    if (typeof rawDuration === 'undefined' || rawDuration === '') {
+      return undefined;
+    }
+
+    const durationMinutes: number = parseInt(String(rawDuration), 10);
+    if (Number.isNaN(durationMinutes) || durationMinutes <= 0) {
+      return undefined;
+    }
+
+    return durationMinutes * 60 * 1000;
+  }
+
+  private _normalizeRecurringDuration(durationMs: number, isAllDay: boolean): number {
+    const minimumMs: number = isAllDay ? 24 * 60 * 60 * 1000 : 15 * 60 * 1000;
+    const maximumMs: number = isAllDay ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+    if (durationMs < minimumMs) {
+      return minimumMs;
+    }
+    if (durationMs > maximumMs) {
+      return minimumMs;
+    }
+    return durationMs;
   }
 
   private _buildItemUrl(displayFormUrl: string, itemId: string): string | undefined {

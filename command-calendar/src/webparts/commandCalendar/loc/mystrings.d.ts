@@ -7,6 +7,8 @@ declare interface ICommandCalendarWebPartStrings {
   LookAheadDaysFieldLabel: string;
   CalendarSourcesFieldLabel: string;
   CalendarSourcesFieldDescription: string;
+  CategoryColorMappingsFieldLabel: string;
+  CategoryColorMappingsFieldDescription: string;
 }
 
 declare module 'CommandCalendarWebPartStrings' {

@@ -16,6 +16,7 @@ import { ICommandCalendarProps } from './components/ICommandCalendarProps';
 export interface ICommandCalendarWebPartProps {
   description: string;
   calendarSources: string;
+  categoryColorMappings: string;
   lookBackDays: number;
   lookAheadDays: number;
 }
@@ -28,6 +29,7 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
       {
         description: this.properties.description,
         calendarSources: this.properties.calendarSources,
+        categoryColorMappings: this.properties.categoryColorMappings,
         lookBackDays: this.properties.lookBackDays,
         lookAheadDays: this.properties.lookAheadDays,
         spHttpClient: this.context.spHttpClient
@@ -48,6 +50,10 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
 
     if (!this.properties.calendarSources) {
       this.properties.calendarSources = '';
+    }
+
+    if (!this.properties.categoryColorMappings) {
+      this.properties.categoryColorMappings = '';
     }
 
     return Promise.resolve();
@@ -114,6 +120,12 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
                   description: strings.CalendarSourcesFieldDescription,
                   multiline: true,
                   rows: 8
+                }),
+                PropertyPaneTextField('categoryColorMappings', {
+                  label: strings.CategoryColorMappingsFieldLabel,
+                  description: strings.CategoryColorMappingsFieldDescription,
+                  multiline: true,
+                  rows: 6
                 })
               ]
             }

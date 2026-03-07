@@ -3,6 +3,7 @@ export interface ICalendarSourceConfig {
   siteUrl: string;
   listTitle: string;
   displayName: string;
+  staffGroup: string;
   color: string;
 }
 
