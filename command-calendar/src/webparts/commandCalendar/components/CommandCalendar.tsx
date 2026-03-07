@@ -31,15 +31,16 @@ const DEFAULT_CATEGORY_COLORS: string[] = [
   '#038387'
 ];
 type CalendarMode = 'day' | 'week' | 'month';
+const BUSINESS_HOUR_START: number = 8;
+const BUSINESS_HOUR_END: number = 18;
 interface IHorizonBlock {
   label: string;
   startOffsetDays: number;
   endOffsetDays: number;
 }
-interface ICategoryLegendItem {
-  key: string;
-  label: string;
-  color: string;
+interface ISwimLaneDefinition {
+  laneName: string;
+  calendarNames: string[];
 }
 
 const HORIZON_BLOCKS: IHorizonBlock[] = [
@@ -57,6 +58,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
   const [activeView, setActiveView] = React.useState<string>('gantt');
   const [calendarFocusDate, setCalendarFocusDate] = React.useState<Date>(startOfDay(new Date()));
   const [calendarMode, setCalendarMode] = React.useState<CalendarMode>('month');
+  const [showFullDayHours, setShowFullDayHours] = React.useState<boolean>(false);
   const [reloadToken, setReloadToken] = React.useState<number>(0);
   const [ganttRangeDays, setGanttRangeDays] = React.useState<number>(60);
 
@@ -177,26 +179,6 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     return configuredMap;
   }, [events, props.categoryColorMappings]);
 
-  const categoryLegendItems: ICategoryLegendItem[] = React.useMemo(() => {
-    const categoryDisplayMap: Record<string, string> = {};
-    events.forEach((event: ICalendarEvent) => {
-      event.categories.forEach((category: string) => {
-        const normalized: string = normalizeCategoryKey(category);
-        if (!categoryDisplayMap[normalized]) {
-          categoryDisplayMap[normalized] = category;
-        }
-      });
-    });
-
-    return Object.keys(categoryDisplayMap)
-      .sort((a: string, b: string) => categoryDisplayMap[a].localeCompare(categoryDisplayMap[b]))
-      .map((key: string) => ({
-        key,
-        label: categoryDisplayMap[key],
-        color: categoryColorMap[key] || '#605e5c'
-      }));
-  }, [categoryColorMap, events]);
-
   const sourceByKey: Record<string, ICalendarSourceConfig> = React.useMemo(() => {
     const lookup: Record<string, ICalendarSourceConfig> = {};
     parsedSources.sources.forEach((source: ICalendarSourceConfig) => {
@@ -204,6 +186,29 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     });
     return lookup;
   }, [parsedSources.sources]);
+
+  const parsedSwimLaneMappings: ISwimLaneDefinition[] = React.useMemo(
+    () => parseSwimLaneMappings(props.swimLaneMappings || ''),
+    [props.swimLaneMappings]
+  );
+
+  const sourceToLaneMap: Record<string, string> = React.useMemo(() => {
+    const mapping: Record<string, string> = {};
+    parsedSwimLaneMappings.forEach((laneDefinition: ISwimLaneDefinition) => {
+      laneDefinition.calendarNames.forEach((calendarName: string) => {
+        const normalizedCalendarName: string = normalizeCategoryKey(calendarName);
+        parsedSources.sources.forEach((source: ICalendarSourceConfig) => {
+          if (
+            normalizeCategoryKey(source.displayName) === normalizedCalendarName ||
+            normalizeCategoryKey(source.listTitle) === normalizedCalendarName
+          ) {
+            mapping[source.key] = laneDefinition.laneName;
+          }
+        });
+      });
+    });
+    return mapping;
+  }, [parsedSources.sources, parsedSwimLaneMappings]);
 
   const timelineStart: Date = startOfDay(new Date());
   const timelineDays: number = ganttRangeDays;
@@ -223,6 +228,14 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     const weekStart: Date = startOfWeek(calendarFocusDate);
     return Array.from({ length: 7 }, (_: unknown, index: number) => addDays(weekStart, index));
   }, [calendarFocusDate]);
+
+  const visibleHourSlots: number[] = React.useMemo(() => {
+    if (showFullDayHours) {
+      return HOUR_SLOTS;
+    }
+
+    return HOUR_SLOTS.filter((hour: number) => hour >= BUSINESS_HOUR_START && hour <= BUSINESS_HOUR_END);
+  }, [showFullDayHours]);
 
   const sourceWarnings: string[] = parsedSources.errors;
   const hasNoSourcesConfigured: boolean = parsedSources.sources.length === 0;
@@ -312,7 +325,8 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
     const laneMap: Record<string, Record<string, ICalendarEvent[]>> = {};
     visibleEvents.forEach((event: ICalendarEvent) => {
       const source: ICalendarSourceConfig | undefined = sourceByKey[event.sourceKey];
-      const laneName: string = source ? source.staffGroup : 'General';
+      const laneName: string =
+        sourceToLaneMap[event.sourceKey] || (source ? source.staffGroup : 'Unassigned');
       if (!laneMap[laneName]) {
         laneMap[laneName] = {};
       }
@@ -459,9 +473,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
         ))}
         {monthGridDates.map((gridDate: Date) => {
           const dayEvents: ICalendarEvent[] = filteredEvents
-            .filter((event: ICalendarEvent) =>
-              rangesOverlap(event.start, event.end, startOfDay(gridDate), endOfDay(gridDate))
-            )
+            .filter((event: ICalendarEvent) => eventOccursOnDate(event, gridDate))
             .sort((a: ICalendarEvent, b: ICalendarEvent) => a.start.getTime() - b.start.getTime());
 
           const isCurrentMonth: boolean = gridDate.getMonth() === calendarFocusDate.getMonth();
@@ -509,7 +521,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
               </div>
             </div>
           )}
-          {HOUR_SLOTS.map((hour: number) => {
+          {visibleHourSlots.map((hour: number) => {
             const slotStart: Date = new Date(
               dayStart.getFullYear(),
               dayStart.getMonth(),
@@ -562,7 +574,7 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
               </div>
             ))}
           </div>
-          {HOUR_SLOTS.map((hour: number) => (
+          {visibleHourSlots.map((hour: number) => (
             <div className={styles.weekHourRow} key={`week-hour-${hour}`}>
               <div className={styles.weekTimeColumn}>{formatHourLabel(hour)}</div>
               {weekDates.map((weekDate: Date) => {
@@ -607,6 +619,10 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
             />
             <DefaultButton text="Today" onClick={() => setCalendarFocusDate(startOfDay(new Date()))} />
             <DefaultButton text="Next" onClick={() => shiftCalendar(1)} />
+            <DefaultButton
+              text={showFullDayHours ? '8am-6pm' : '24 Hours'}
+              onClick={() => setShowFullDayHours((currentValue: boolean) => !currentValue)}
+            />
           </div>
           <div className={styles.calendarModeButtons}>
             {(['day', 'week', 'month'] as CalendarMode[]).map((mode: CalendarMode) => (
@@ -698,15 +714,6 @@ const CommandCalendar: React.FC<ICommandCalendarProps> = (props: ICommandCalenda
           siteUrl|calendarListTitle|Display Name|Staff Group
         </MessageBar>
       )}
-
-      <div className={styles.sourcesLegend}>
-        {categoryLegendItems.map((legendItem: ICategoryLegendItem) => (
-          <span className={styles.sourceLegendItem} key={legendItem.key}>
-            <span className={styles.sourceLegendDot} style={{ backgroundColor: legendItem.color }} />
-            {legendItem.label}
-          </span>
-        ))}
-      </div>
 
       <div className={styles.filterBar}>
         <Dropdown
@@ -918,6 +925,25 @@ function isEventStartingInSlot(event: ICalendarEvent, slotStart: Date, slotEnd: 
   return event.start.getTime() >= slotStart.getTime() && event.start.getTime() < slotEnd.getTime();
 }
 
+function eventOccursOnDate(event: ICalendarEvent, targetDate: Date): boolean {
+  const dayStart: Date = startOfDay(targetDate);
+  const dayEnd: Date = endOfDay(targetDate);
+
+  if (event.isAllDay) {
+    return rangesOverlap(event.start, event.end, dayStart, dayEnd);
+  }
+
+  return isSameCalendarDay(event.start, targetDate);
+}
+
+function isSameCalendarDay(firstDate: Date, secondDate: Date): boolean {
+  return (
+    firstDate.getFullYear() === secondDate.getFullYear() &&
+    firstDate.getMonth() === secondDate.getMonth() &&
+    firstDate.getDate() === secondDate.getDate()
+  );
+}
+
 function parseCategoryColors(rawMappings: string): Record<string, string> {
   const mapping: Record<string, string> = {};
   rawMappings
@@ -938,6 +964,42 @@ function parseCategoryColors(rawMappings: string): Record<string, string> {
       mapping[normalizeCategoryKey(categoryName)] = normalizedColor;
     });
   return mapping;
+}
+
+function parseSwimLaneMappings(rawMappings: string): ISwimLaneDefinition[] {
+  const definitions: ISwimLaneDefinition[] = [];
+  rawMappings
+    .split('\n')
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0)
+    .forEach((line: string) => {
+      const parts: string[] = line.split('|').map((part: string) => part.trim());
+      if (parts.length < 2) {
+        return;
+      }
+
+      const laneName: string = parts[0];
+      const calendarsRaw: string = parts[1];
+      if (!laneName || !calendarsRaw) {
+        return;
+      }
+
+      const calendarNames: string[] = calendarsRaw
+        .split(',')
+        .map((value: string) => value.trim())
+        .filter((value: string) => value.length > 0);
+
+      if (calendarNames.length === 0) {
+        return;
+      }
+
+      definitions.push({
+        laneName,
+        calendarNames
+      });
+    });
+
+  return definitions;
 }
 
 function normalizeCategoryKey(category: string): string {

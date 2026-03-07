@@ -16,6 +16,7 @@ import { ICommandCalendarProps } from './components/ICommandCalendarProps';
 export interface ICommandCalendarWebPartProps {
   description: string;
   calendarSources: string;
+  swimLaneMappings: string;
   categoryColorMappings: string;
   lookBackDays: number;
   lookAheadDays: number;
@@ -29,6 +30,7 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
       {
         description: this.properties.description,
         calendarSources: this.properties.calendarSources,
+        swimLaneMappings: this.properties.swimLaneMappings,
         categoryColorMappings: this.properties.categoryColorMappings,
         lookBackDays: this.properties.lookBackDays,
         lookAheadDays: this.properties.lookAheadDays,
@@ -54,6 +56,10 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
 
     if (!this.properties.categoryColorMappings) {
       this.properties.categoryColorMappings = '';
+    }
+
+    if (!this.properties.swimLaneMappings) {
+      this.properties.swimLaneMappings = '';
     }
 
     return Promise.resolve();
@@ -120,6 +126,12 @@ export default class CommandCalendarWebPart extends BaseClientSideWebPart<IComma
                   description: strings.CalendarSourcesFieldDescription,
                   multiline: true,
                   rows: 8
+                }),
+                PropertyPaneTextField('swimLaneMappings', {
+                  label: strings.SwimLaneMappingsFieldLabel,
+                  description: strings.SwimLaneMappingsFieldDescription,
+                  multiline: true,
+                  rows: 6
                 }),
                 PropertyPaneTextField('categoryColorMappings', {
                   label: strings.CategoryColorMappingsFieldLabel,

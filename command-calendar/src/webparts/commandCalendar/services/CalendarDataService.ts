@@ -323,7 +323,8 @@ export class CalendarDataService {
     const fallbackStart: Date = new Date(String(item.EventDate || ''));
     const fallbackEnd: Date = new Date(String(item.EndDate || ''));
     const start: Date = occurrenceStart || fallbackStart;
-    const durationOverrideMs: number | undefined = this._getDurationMsFromItem(item);
+    const isAllDay: boolean = Boolean(item.fAllDayEvent);
+    const durationOverrideMs: number | undefined = this._getDurationMsFromItem(item, isAllDay);
     let end: Date = occurrenceEnd || fallbackEnd;
     if (durationOverrideMs && (!occurrenceEnd || end.getTime() < start.getTime())) {
       end = new Date(start.getTime() + durationOverrideMs);
@@ -351,7 +352,7 @@ export class CalendarDataService {
       itemUrl: this._buildItemUrl(displayFormUrl, itemId),
       location: item.Location ? String(item.Location) : undefined,
       description: this._toPlainText(item.Description ? String(item.Description) : ''),
-      isAllDay: Boolean(item.fAllDayEvent),
+      isAllDay,
       isRecurringInstance
     };
   }
@@ -386,10 +387,10 @@ export class CalendarDataService {
       return [];
     }
 
-    const durationFromItemMs: number | undefined = this._getDurationMsFromItem(item);
+    const durationFromItemMs: number | undefined = this._getDurationMsFromItem(item, baseEvent.isAllDay);
     const fallbackDurationMs: number = Math.max(1, baseEvent.end.getTime() - baseEvent.start.getTime());
-    const durationMs: number = durationFromItemMs || this._normalizeRecurringDuration(
-      fallbackDurationMs,
+    const durationMs: number = this._normalizeRecurringDuration(
+      durationFromItemMs || fallbackDurationMs,
       baseEvent.isAllDay
     );
     const seriesEndByRule: Date = parsedRule.windowEnd || rangeEnd;
@@ -438,18 +439,26 @@ export class CalendarDataService {
     return occurrences;
   }
 
-  private _getDurationMsFromItem(item: Record<string, unknown>): number | undefined {
+  private _getDurationMsFromItem(
+    item: Record<string, unknown>,
+    isAllDay: boolean
+  ): number | undefined {
     const rawDuration: unknown = item.Duration;
     if (typeof rawDuration === 'undefined' || rawDuration === '') {
       return undefined;
     }
 
-    const durationMinutes: number = parseInt(String(rawDuration), 10);
-    if (Number.isNaN(durationMinutes) || durationMinutes <= 0) {
+    const numericDuration: number = parseInt(String(rawDuration), 10);
+    if (Number.isNaN(numericDuration) || numericDuration <= 0) {
       return undefined;
     }
 
-    return durationMinutes * 60 * 1000;
+    // SharePoint can return Duration in either minutes or seconds depending on API shape.
+    if (!isAllDay && numericDuration > 1440 && numericDuration <= 86400) {
+      return numericDuration * 1000;
+    }
+
+    return numericDuration * 60 * 1000;
   }
 
   private _normalizeRecurringDuration(durationMs: number, isAllDay: boolean): number {

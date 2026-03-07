@@ -32,18 +32,37 @@ A **multi-select Category filter** applies globally to all views.
 In the web part property pane, configure **Calendar sources** as one source per line:
 
 ```text
-siteUrl|calendarListTitle|Display Name|#Color
+siteUrl|calendarListTitle|Display Name|Staff Group
 ```
 
 Examples:
 
 ```text
-https://contoso.sharepoint.com/sites/command|Calendar|Command Site|#0078d4
-https://contoso.sharepoint.com/sites/ops|Operations Calendar|Ops|#d83b01
-https://contoso.sharepoint.com/sites/projects|Project Calendar|Projects|#107c10
+https://contoso.sharepoint.com/sites/command|Calendar|Command Site|G1
+https://contoso.sharepoint.com/sites/ops|Operations Calendar|Ops|G2
+https://contoso.sharepoint.com/sites/projects|Project Calendar|Projects|G357
 ```
 
-Only `siteUrl|calendarListTitle` is required. `Display Name` and `#Color` are optional.
+Only `siteUrl|calendarListTitle` is required. `Display Name` and `Staff Group` are optional.
+
+Optional advanced mapping for Gantt swim lanes:
+
+```text
+Lane Name|Calendar Display Name,Another Calendar
+```
+
+Example:
+
+```text
+G1|Command Site,Ops
+G2|Projects
+```
+
+Optional category coloring:
+
+```text
+Category|#Color
+```
 
 ---
 

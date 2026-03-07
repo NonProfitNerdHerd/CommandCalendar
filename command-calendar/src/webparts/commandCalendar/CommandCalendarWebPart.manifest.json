@@ -24,6 +24,7 @@
     "properties": {
       "description": "Multi-source SharePoint calendar command view",
       "calendarSources": "",
+      "swimLaneMappings": "",
       "categoryColorMappings": "",
       "lookBackDays": 30,
       "lookAheadDays": 120

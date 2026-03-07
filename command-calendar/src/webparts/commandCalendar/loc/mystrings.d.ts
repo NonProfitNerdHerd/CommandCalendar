@@ -7,6 +7,8 @@ declare interface ICommandCalendarWebPartStrings {
   LookAheadDaysFieldLabel: string;
   CalendarSourcesFieldLabel: string;
   CalendarSourcesFieldDescription: string;
+  SwimLaneMappingsFieldLabel: string;
+  SwimLaneMappingsFieldDescription: string;
   CategoryColorMappingsFieldLabel: string;
   CategoryColorMappingsFieldDescription: string;
 }
