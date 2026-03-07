@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "command-calendar-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/commandCalendar/CommandCalendarWebPart.js",
+          "manifest": "./src/webparts/commandCalendar/CommandCalendarWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "CommandCalendarWebPartStrings": "lib/webparts/commandCalendar/loc/{locale}.js"
+  }
+}

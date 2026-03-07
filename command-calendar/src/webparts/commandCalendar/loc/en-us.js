@@ -1,0 +1,12 @@
+define([], function() {
+  return {
+    "PropertyPaneDescription": "Configure your Command Calendar web part.",
+    "GeneralSettingsGroupName": "General settings",
+    "CalendarSourcesGroupName": "Calendar sources",
+    "DescriptionFieldLabel": "Header description",
+    "LookBackDaysFieldLabel": "Days to load in the past",
+    "LookAheadDaysFieldLabel": "Days to load in the future",
+    "CalendarSourcesFieldLabel": "Calendar sources",
+    "CalendarSourcesFieldDescription": "One source per line: siteUrl|calendarListTitle|Display Name|#Color"
+  }
+});

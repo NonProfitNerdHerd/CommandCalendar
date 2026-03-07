@@ -1,0 +1,307 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+.commandCalendar {
+  padding: 16px;
+  color: "[theme:bodyText, default: #323130]";
+  color: var(--bodyText);
+  background: #ffffff;
+}
+
+.headerArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.subtitle {
+  margin-top: 4px;
+  color: #605e5c;
+}
+
+.sourcesLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 10px 0;
+}
+
+.sourceLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #edebe9;
+  border-radius: 14px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.sourceLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.categoryDropdown {
+  min-width: 320px;
+  max-width: 520px;
+}
+
+.ganttView {
+  margin-top: 8px;
+}
+
+.ganttHeader {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(420px, 3fr);
+  gap: 12px;
+  border-bottom: 1px solid #edebe9;
+  padding: 8px 0;
+  font-weight: 600;
+  color: #323130;
+}
+
+.ganttEventColumn {
+  font-size: 13px;
+}
+
+.ganttTimelineColumn {
+  font-size: 13px;
+}
+
+.ganttRow {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(420px, 3fr);
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f2f1;
+}
+
+.ganttEventMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.eventTitle {
+  font-weight: 600;
+}
+
+.sourcePill {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: #323130;
+}
+
+.eventTime {
+  font-size: 12px;
+  color: #605e5c;
+}
+
+.ganttTrack {
+  position: relative;
+  height: 18px;
+  border-radius: 8px;
+  background: #f3f2f1;
+  overflow: hidden;
+}
+
+.ganttBar {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 8px;
+  opacity: 0.9;
+}
+
+.calendarView {
+  margin-top: 8px;
+}
+
+.calendarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.calendarTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.calendarActions {
+  display: flex;
+  gap: 8px;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  border-top: 1px solid #edebe9;
+  border-left: 1px solid #edebe9;
+}
+
+.calendarCell {
+  min-height: 112px;
+  border-right: 1px solid #edebe9;
+  border-bottom: 1px solid #edebe9;
+  padding: 6px;
+}
+
+.calendarCellMuted {
+  background: #faf9f8;
+  color: #8a8886;
+}
+
+.calendarDayLabel {
+  min-height: auto;
+  font-weight: 600;
+  background: #f8f8f8;
+}
+
+.calendarDate {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.calendarItems {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.calendarItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.calendarItemDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.calendarItemText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.moreItems {
+  font-size: 11px;
+  color: #605e5c;
+}
+
+.quadView {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.quadCard {
+  border: 1px solid #edebe9;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+}
+
+.quadHeader {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.quadCount {
+  font-size: 30px;
+  font-weight: 700;
+  margin: 8px 0 10px;
+}
+
+.quadList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quadItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quadItemTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quadItemMeta {
+  font-size: 11px;
+  color: #605e5c;
+}
+
+.emptyInline {
+  color: #605e5c;
+  font-size: 12px;
+}
+
+.emptyState {
+  padding: 14px;
+  color: #605e5c;
+  border: 1px dashed #c8c6c4;
+  margin-top: 8px;
+  border-radius: 6px;
+}
+
+@media (max-width: 1180px) {
+  .quadView {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .ganttHeader,
+  .ganttRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .calendarGrid {
+    grid-template-columns: repeat(1, minmax(100px, 1fr));
+  }
+
+  .calendarDayLabel {
+    display: none;
+  }
+
+  .quadView {
+    grid-template-columns: repeat(1, minmax(220px, 1fr));
+  }
+}

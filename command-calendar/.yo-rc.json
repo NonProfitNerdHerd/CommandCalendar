@@ -1,0 +1,23 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "whichFolder": "subdir",
+    "solutionName": "command-calendar",
+    "environment": "spo",
+    "packageManager": "npm",
+    "skipFeatureDeployment": true,
+    "useGulp": false,
+    "componentType": "webpart",
+    "template": "react",
+    "componentName": "CommandCalendar",
+    "componentDescription": "Aggregated SharePoint calendars with multiple views",
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.21.1",
+    "sdksVersions": {},
+    "version": "1.22.2",
+    "libraryName": "command-calendar",
+    "libraryId": "8aba1103-bf53-4a4b-8dfd-8bb57e8997e2",
+    "solutionShortDescription": "command-calendar description",
+    "isDomainIsolated": false
+  }
+}
