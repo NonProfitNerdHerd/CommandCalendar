@@ -1,0 +1,59 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "Command Calendar V2",
+    "id": "fdcba3a4-d4a6-4ac7-a370-98c7d5d8e7db",
+    "version": "2.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "iconPath": "images/AppIcon.png",
+    "developer": {
+      "name": "Command Calendar Team",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": ""
+    },
+    "webApiPermissionRequests": [
+      {
+        "resource": "Microsoft Graph",
+        "scope": "User.Read"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "User.Read.All"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Calendars.Read.Shared"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Group.Read.All"
+      }
+    ],
+    "metadata": {
+      "shortDescription": {
+        "default": "Command Calendar V2 based on timeline-calendar."
+      },
+      "longDescription": {
+        "default": "Command Calendar V2 uses timeline-calendar interactions and adds tabs for Gnatt Chart, Calendar, and Agenda views."
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "command-calendar-v2 Feature",
+        "description": "The feature that activates elements of the command-calendar-v2 solution.",
+        "id": "ab611fa5-0740-4d5f-8cf4-fdd0ab5fcdfa",
+        "version": "2.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/command-calendar-v2.sppkg"
+  }
+}

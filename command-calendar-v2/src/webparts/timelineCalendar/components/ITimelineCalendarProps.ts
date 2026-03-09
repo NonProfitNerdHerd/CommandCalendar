@@ -1,0 +1,40 @@
+import { WebPartContext } from "@microsoft/sp-webpart-base";
+import { MSGraphClientV3 } from '@microsoft/sp-http';
+
+export interface ITimelineCalendarProps {
+  description: string;
+  isDarkTheme: boolean;
+  environmentMessage: string;
+  hasTeamsContext: boolean;
+  userDisplayName: string;
+  instanceId: string;
+  //renderLegend: any;
+  //setGroups: any;
+  categories: any[];
+  groups: any[];
+  lists: any[];
+  calsAndPlans: any[];
+  //renderEvents: any;
+  getDefaultTooltip: any;
+  ensureValidClassName: any;
+  buildDivStyles: any;
+  context: WebPartContext;
+  graphClient: Promise<MSGraphClientV3>;
+  getGraphScopes: string[];
+  domElement: HTMLElement;
+  minDays: number;
+  maxDays: number;
+  initialStartDays: number;
+  initialEndDays: number;
+  holidayCategories: string;
+  fillFullWidth: boolean;
+  calcMaxHeight: boolean;
+  singleDayAsPoint: boolean;
+  overflowTextVisible: boolean;
+  hideItemBoxBorder: boolean;
+  //hideSocialBar: boolean;
+  //getDatesAsUtc: boolean;
+  tooltipEditor: string;
+  visJsonProperties: string;
+  cssOverrides: string;
+}
