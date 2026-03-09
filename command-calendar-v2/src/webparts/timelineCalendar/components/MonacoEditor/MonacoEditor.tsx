@@ -1,115 +1,47 @@
-import { isEmpty } from "lodash";
 import * as React from "react";
-import { Elanguages } from ".";
 import { IMonacoEditorProps } from "./IMonacoEditorProps";
-import { useMonacoEditorStyles } from "./useMonacoEditorStyles";
-import { EStatus, useMonaco } from "./useMonaco";
-import { Spinner, SpinnerSize } from "@fluentui/react/lib/Spinner";
-import { Stack } from "@fluentui/react/lib/Stack";
-import { Error } from "./Error";
-import { editor } from "monaco-editor";
 
-export const MonacoEditor: React.FunctionComponent<IMonacoEditorProps> = (props: React.PropsWithChildren<IMonacoEditorProps>) => {
-  const {
-    value,
-    onValueChange,
-    theme,
-    readOnly,
-    showLineNumbers,
-    showMiniMap,
-    language,
-    jsonDiagnosticsOptions,
-    jscriptDiagnosticsOptions,
-  } = props || ({} as IMonacoEditorProps);
-
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const editorRef = React.useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const { controlClasses } = useMonacoEditorStyles();
-  const { monaco, status, error } = useMonaco();
-
-  const onDidChangeModelContent = React.useCallback((e: any): void => { // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (editorRef.current) {
-        const currentValue: string = editorRef.current.getValue();
-        if (currentValue !== value) {
-          const validationErrors: string[] = [];
-          try {
-            if (language === Elanguages.json) {
-              JSON.parse(currentValue);
-            }
-          } catch (e) {
-            validationErrors.push(e.message);
-          }
-          console.log(currentValue);
-          onValueChange(currentValue, validationErrors);
-        }
-      }
-    },
-    [onValueChange]
-  );
+// CSP-safe editor: intentionally avoids loading Monaco/CDN scripts.
+export const MonacoEditor: React.FunctionComponent<IMonacoEditorProps> = (
+  props: React.PropsWithChildren<IMonacoEditorProps>
+) => {
+  const { value, onValueChange, readOnly } = props || ({} as IMonacoEditorProps);
+  const [textValue, setTextValue] = React.useState<string>(value || "");
 
   React.useEffect(() => {
-    if (status !== EStatus.LOADED) return;
+    setTextValue(value || "");
+  }, [value]);
 
-    if (!isEmpty(jsonDiagnosticsOptions) && language === Elanguages.json) {
-      monaco.languages.json.jsonDefaults.setDiagnosticsOptions(jsonDiagnosticsOptions);
-    }
-    if (!isEmpty(jscriptDiagnosticsOptions) && language === Elanguages.javascript) {
-      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(jscriptDiagnosticsOptions);
-    }
+  const onTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
+    const nextValue: string = e.target.value;
+    setTextValue(nextValue);
+    onValueChange(nextValue, []);
+  };
 
-    monaco.editor.onDidCreateModel((m: editor.ITextModel) => {
-      m.updateOptions({
-        tabSize: 2,
-      });
-    });
-
-    //Create the MonacoEditor
-    editorRef.current = monaco.editor.create(containerRef.current, {
-      value: value,
-      scrollBeyondLastLine: false,
-      theme: theme,
-      language: language,
-      folding: true,
-      readOnly: readOnly,
-      lineNumbersMinChars: 4,
-      lineNumbers: showLineNumbers ? "on" : "off",
-      minimap: {
-        enabled: showMiniMap,
-      },
-    });
-
-    editorRef.current.onDidChangeModelContent(onDidChangeModelContent);
-    return () => {
-      editorRef?.current?.dispose();
-    };
-  }, [jsonDiagnosticsOptions, jscriptDiagnosticsOptions, monaco]);
-
-  if (status === EStatus.LOADING) {
-    return (
-      <Stack horizontal horizontalAlign="center" tokens={{ padding: 25 }}>
-        <Spinner size={SpinnerSize.medium} />
-      </Stack>
-    );
-  }
-
-  function onTextareaChange(e:any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    //console.log(this); //undefined  
-    //console.log(e.target.value); //or e.nativeEvent.data
-      const validationErrors: string[] = [];
-      onValueChange(e.target.value, validationErrors);
-  }
-  if (status === EStatus.ERROR) {
-    return (
-      <>
-        <Error error={error} show={true} />
-        <div style={{"margin":"10px 0px"}}>Using a simple textarea editor as a fallback:</div>
-        <textarea onChange={onTextareaChange} spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="none" rows={30} cols={115} style={{"backgroundColor":"black", "color": "antiquewhite", "padding":"15px"}}>{value}</textarea>
-      </>
-    );
-  }
   return (
     <>
-      <div ref={containerRef} className={controlClasses.containerStyles} />
+      <div style={{ margin: "10px 0px", fontSize: "12px", color: "#605e5c" }}>
+        Advanced editor running in CSP-safe textarea mode.
+      </div>
+      <textarea
+        value={textValue}
+        onChange={onTextareaChange}
+        readOnly={readOnly}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        rows={30}
+        cols={115}
+        style={{
+          width: "100%",
+          backgroundColor: "#111",
+          color: "antiquewhite",
+          padding: "12px",
+          fontFamily: "Consolas, Monaco, monospace",
+          fontSize: "12px"
+        }}
+      />
     </>
   );
 };
