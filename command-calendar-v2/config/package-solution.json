@@ -3,14 +3,14 @@
   "solution": {
     "name": "Command Calendar V2",
     "id": "fdcba3a4-d4a6-4ac7-a370-98c7d5d8e7db",
-    "version": "2.0.0.0",
+    "version": "2.1.0.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
     "iconPath": "images/AppIcon.png",
     "developer": {
-      "name": "Command Calendar Team",
-      "websiteUrl": "",
+      "name": "Michael Vasiloff",
+      "websiteUrl": "https://github.com/spsprinkles/timeline-calendar/",
       "privacyUrl": "",
       "termsOfUseUrl": "",
       "mpnId": ""
@@ -38,7 +38,7 @@
         "default": "Command Calendar V2 based on timeline-calendar."
       },
       "longDescription": {
-        "default": "Command Calendar V2 uses timeline-calendar interactions and adds tabs for Gnatt Chart, Calendar, and Agenda views."
+        "default": "Command Calendar V2 keeps timeline-calendar interactions and adds a secondary Calendar tab."
       },
       "screenshotPaths": [],
       "videoUrl": "",
@@ -49,7 +49,7 @@
         "title": "command-calendar-v2 Feature",
         "description": "The feature that activates elements of the command-calendar-v2 solution.",
         "id": "ab611fa5-0740-4d5f-8cf4-fdd0ab5fcdfa",
-        "version": "2.0.0.0"
+        "version": "2.1.0.0"
       }
     ]
   },

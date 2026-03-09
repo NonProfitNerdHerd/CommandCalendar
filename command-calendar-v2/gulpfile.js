@@ -2,11 +2,6 @@
 
 const build = require('@microsoft/sp-build-web');
 
-// Preserve upstream behavior but allow packaging in this environment
-if (build.eslintCmd) {
-  build.eslintCmd.enabled = false;
-}
-
 build.addSuppression(`Warning - [sass] The local CSS class 'ms-Grid' is not camelCase and will not be type-safe.`);
 
 var getTasks = build.rig.getTasks;

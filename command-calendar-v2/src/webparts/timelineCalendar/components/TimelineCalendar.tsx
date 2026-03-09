@@ -41,20 +41,11 @@ interface IItemDateInfo {
   eventEndDate?: Date
 }
 
-interface ITimelineCalendarState {
-  activeView: 'gantt' | 'calendar' | 'agenda';
-  refreshToken: number;
-}
-
-export default class TimelineCalendar extends React.Component<ITimelineCalendarProps, ITimelineCalendarState> {
+export default class TimelineCalendar extends React.Component<ITimelineCalendarProps, {}> {
   private _timeline: Timeline;
   private _dsItems: any;
   private _dsGroups: any;
   private _isLoadingEvents: boolean = false;
-  public state: ITimelineCalendarState = {
-    activeView: 'gantt',
-    refreshToken: 0
-  };
 
   /**
    * Called when component is mounted (only on the *initial* loading of the web part)
@@ -304,168 +295,17 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //this.domElement == null
     //Had: ICustomDropdownOption, ICustomCollectionField
     const {instanceId} = this.props;
-    const { activeView } = this.state;
 
     return (
       <div>
-        <div style={{display: "flex", gap: "8px", marginBottom: "8px"}}>
-          {this._renderViewTab('gantt', 'Gnatt Chart View')}
-          {this._renderViewTab('calendar', 'Calendar View')}
-          {this._renderViewTab('agenda', 'Agenda View')}
-        </div>
         <div className={'container-' + this.props.instanceId}>
           <div id={"legend-" + instanceId} style={{display:"none"}} />
-          <div id={"timeline-" + instanceId} style={{display: activeView === 'gantt' ? 'block' : 'none'}} />
-          {activeView === 'calendar' && this._renderCalendarView()}
-          {activeView === 'agenda' && this._renderAgendaView()}
+          <div id={"timeline-" + instanceId} />
         </div>
         <div id={"bottomGroupsBar-" + instanceId} className='bottomGroupsBar' />
         <div id={"dialog-" + instanceId} />
       </div>
     )
-  }
-
-  private _renderViewTab(view: 'gantt' | 'calendar' | 'agenda', label: string): JSX.Element {
-    const isActive: boolean = this.state.activeView === view;
-    return (
-      <button
-        type="button"
-        onClick={() => this._setActiveView(view)}
-        style={{
-          border: isActive ? '1px solid #0078d4' : '1px solid #c8c6c4',
-          backgroundColor: isActive ? '#eff6fc' : '#ffffff',
-          color: isActive ? '#0078d4' : '#323130',
-          borderRadius: '4px',
-          padding: '6px 12px',
-          fontWeight: isActive ? 600 : 400,
-          cursor: 'pointer'
-        }}
-      >
-        {label}
-      </button>
-    );
-  }
-
-  private _setActiveView(view: 'gantt' | 'calendar' | 'agenda'): void {
-    this.setState({ activeView: view }, () => {
-      if (view === 'gantt' && this._timeline) {
-        this._timeline.redraw();
-      }
-    });
-  }
-
-  private _getTimelineItems(): any[] {
-    if (!this._dsItems || !this._dsItems.get) {
-      return [];
-    }
-
-    const items: any[] = this._dsItems.get({
-      filter: function(item:any):boolean {
-        return item.className !== "weekend";
-      }
-    }) || [];
-
-    return items
-      .filter((item:any) => item && item.start)
-      .map((item:any) => {
-        const startDate: Date = new Date(item.start);
-        const endDate: Date = item.end ? new Date(item.end) : new Date(item.start);
-        const normalizedEnd: Date = (isNaN(endDate.getTime()) || endDate < startDate) ? startDate : endDate;
-        return {
-          id: item.id,
-          title: this._stripHtml(item.content || item.title || item.name || '(Untitled)'),
-          start: startDate,
-          end: normalizedEnd,
-          className: item.className || '',
-          source: item.listTitle || item.calendarName || '',
-          description: this._stripHtml(item.description || item.tooltip || '')
-        };
-      })
-      .sort((a:any, b:any) => a.start.getTime() - b.start.getTime());
-  }
-
-  private _renderCalendarView(): JSX.Element {
-    const now: Date = new Date();
-    const monthStart: Date = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd: Date = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const gridStart: Date = new Date(monthStart.getTime());
-    gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-    const days: Date[] = [];
-    for (let i=0; i<42; i++) {
-      const day = new Date(gridStart.getTime());
-      day.setDate(gridStart.getDate() + i);
-      days.push(day);
-    }
-
-    const items: any[] = this._getTimelineItems().filter((item:any) =>
-      item.start.getTime() <= monthEnd.getTime() && item.end.getTime() >= monthStart.getTime()
-    );
-
-    return (
-      <div style={{border: '1px solid #edebe9', marginTop: '8px'}}>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(7, minmax(110px, 1fr))', background:'#faf9f8', borderBottom:'1px solid #edebe9'}}>
-          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(day => (
-            <div key={day} style={{padding:'6px', fontWeight:600, fontSize:'12px'}}>{day}</div>
-          ))}
-        </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(7, minmax(110px, 1fr))'}}>
-          {days.map((day:Date) => {
-            const dayEvents: any[] = items.filter((item:any) => this._eventOccursOnDay(item, day));
-            const isCurrentMonth: boolean = day.getMonth() === monthStart.getMonth();
-            return (
-              <div key={day.toISOString()} style={{borderRight:'1px solid #f3f2f1', borderBottom:'1px solid #f3f2f1', minHeight:'95px', padding:'6px', background:isCurrentMonth ? '#fff' : '#faf9f8'}}>
-                <div style={{fontWeight:600, fontSize:'12px', marginBottom:'4px'}}>{day.getDate()}</div>
-                {dayEvents.slice(0,3).map((item:any) => (
-                  <div key={`${day.toISOString()}-${item.id}`} style={{fontSize:'11px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
-                    {item.title}
-                  </div>
-                ))}
-                {dayEvents.length > 3 && <div style={{fontSize:'11px', color:'#605e5c'}}>+{dayEvents.length - 3} more</div>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  private _renderAgendaView(): JSX.Element {
-    const now: Date = new Date();
-    const start: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const end: Date = new Date(start.getTime());
-    end.setDate(end.getDate() + 30);
-    const items: any[] = this._getTimelineItems()
-      .filter((item:any) => item.start.getTime() >= start.getTime() && item.start.getTime() <= end.getTime())
-      .sort((a:any, b:any) => a.start.getTime() - b.start.getTime());
-
-    return (
-      <div style={{border:'1px solid #edebe9', marginTop:'8px', padding:'10px'}}>
-        {items.length === 0 && <div style={{color:'#605e5c'}}>No upcoming events in next 30 days.</div>}
-        {items.map((item:any) => (
-          <div key={`agenda-${item.id}`} style={{padding:'6px 0', borderBottom:'1px solid #f3f2f1'}}>
-            <div style={{fontWeight:600}}>{item.title}</div>
-            <div style={{fontSize:'12px', color:'#605e5c'}}>
-              {item.start.toLocaleString()} - {item.end.toLocaleString()}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  private _eventOccursOnDay(item:any, day:Date): boolean {
-    const start: Date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
-    const end: Date = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
-    return item.start.getTime() <= end.getTime() && item.end.getTime() >= start.getTime();
-  }
-
-  private _stripHtml(value:string): string {
-    if (!value) {
-      return "";
-    }
-    const tempElem = document.createElement("div");
-    tempElem.innerHTML = value;
-    return (tempElem.textContent || tempElem.innerText || "").trim();
   }
 
   private filterTextForXSS(input:string): string {
@@ -1700,17 +1540,11 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       console.log("TimelineCalendar: Events loaded successfully");
       showLegend();
       this._isLoadingEvents = false;
-      this.setState((prev: ITimelineCalendarState) => ({
-        refreshToken: prev.refreshToken + 1
-      }));
     }).catch(error => {
       //Ensure flag is cleared even on error
       console.error("TimelineCalendar: Error loading events:", error);
       this._isLoadingEvents = false;
       showLegend();
-      this.setState((prev: ITimelineCalendarState) => ({
-        refreshToken: prev.refreshToken + 1
-      }));
     });
   }
 

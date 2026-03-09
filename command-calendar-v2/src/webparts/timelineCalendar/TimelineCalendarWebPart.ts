@@ -7,7 +7,7 @@ import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 import * as strings from 'TimelineCalendarWebPartStrings';
-import TimelineCalendar from './components/TimelineCalendar';
+import TimelineCalendarTabbed from './components/TimelineCalendarTabbed';
 import { ITimelineCalendarProps } from './components/ITimelineCalendarProps';
 import { ICalendarItem, IPersonaProps, IMemberOfResult, ICategoryItem, IGroupItem, IListItem } from './components/IConfigurationItems';
 
@@ -219,7 +219,7 @@ export default class TimelineCalendarWebPart extends BaseClientSideWebPart<ITime
   //this.context (and .instanceId) is valid here
   public render(): void {
     //console.log("render, displayMode:" + this.displayMode.toString());
-    const element: React.ReactElement<ITimelineCalendarProps> = React.createElement(TimelineCalendar,
+    const element: React.ReactElement<ITimelineCalendarProps> = React.createElement(TimelineCalendarTabbed,
       {
         description: this.properties.description,
         isDarkTheme: this._isDarkTheme,

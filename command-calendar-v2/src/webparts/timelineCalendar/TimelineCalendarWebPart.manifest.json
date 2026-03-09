@@ -19,7 +19,7 @@
     "groupId": "5c03119e-3074-46fd-976b-c60198311f70", // Advanced
     "group": { "default": "Advanced" },
     "title": { "default": "Command Calendar V2" },
-    "description": { "default": "Command Calendar V2 with Gnatt Chart, Calendar, and Agenda tabs." },
+    "description": { "default": "Timeline-based calendar with Gnatt Chart and Calendar tabs." },
     "officeFabricIconFontName": "TimelineProgress",
     "properties": {
       "description": "Command Calendar V2",
