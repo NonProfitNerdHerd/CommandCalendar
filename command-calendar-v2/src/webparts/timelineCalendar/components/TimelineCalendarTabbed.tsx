@@ -2,7 +2,7 @@ import * as React from 'react';
 import TimelineCalendar from './TimelineCalendar';
 import { ITimelineCalendarProps } from './ITimelineCalendarProps';
 
-type TViewKey = 'gantt' | 'calendar';
+type TViewKey = 'gantt' | 'calendar' | 'agenda' | 'horizon';
 
 interface ITimelineItem {
   id: string;
@@ -11,7 +11,19 @@ interface ITimelineItem {
   end: Date;
 }
 
+interface IHorizonBlock {
+  label: string;
+  startOffsetDays: number;
+  endOffsetDays: number;
+}
+
 const DAY_LABELS: string[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const HORIZON_BLOCKS: IHorizonBlock[] = [
+  { label: 'Next 30 Days', startOffsetDays: 0, endOffsetDays: 30 },
+  { label: 'Days 31-60', startOffsetDays: 31, endOffsetDays: 60 },
+  { label: 'Days 61-90', startOffsetDays: 61, endOffsetDays: 90 },
+  { label: 'Days 91-120', startOffsetDays: 91, endOffsetDays: 120 }
+];
 
 const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimelineCalendarProps) => {
   const [activeView, setActiveView] = React.useState<TViewKey>('gantt');
@@ -79,6 +91,16 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
           label="Calendar View"
           onClick={() => setActiveView('calendar')}
         />
+        <TabButton
+          isActive={activeView === 'agenda'}
+          label="Agenda View"
+          onClick={() => setActiveView('agenda')}
+        />
+        <TabButton
+          isActive={activeView === 'horizon'}
+          label="30-60-90-120 View"
+          onClick={() => setActiveView('horizon')}
+        />
       </div>
 
       <div style={{ display: activeView === 'gantt' ? 'block' : 'none' }}>
@@ -86,6 +108,12 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       </div>
       <div style={{ display: activeView === 'calendar' ? 'block' : 'none' }}>
         <CalendarMonthGrid events={events} />
+      </div>
+      <div style={{ display: activeView === 'agenda' ? 'block' : 'none' }}>
+        <AgendaView events={events} />
+      </div>
+      <div style={{ display: activeView === 'horizon' ? 'block' : 'none' }}>
+        <HorizonView events={events} />
       </div>
     </div>
   );
@@ -159,6 +187,66 @@ const CalendarMonthGrid: React.FC<{ events: ITimelineItem[] }> = ({ events }) =>
   );
 };
 
+const AgendaView: React.FC<{ events: ITimelineItem[] }> = ({ events }) => {
+  const now: Date = new Date();
+  const endRange: Date = new Date(now.getTime());
+  endRange.setDate(endRange.getDate() + 30);
+  const upcomingEvents: ITimelineItem[] = events
+    .filter((event: ITimelineItem) => event.start.getTime() >= now.getTime() && event.start.getTime() <= endRange.getTime())
+    .sort((a: ITimelineItem, b: ITimelineItem) => a.start.getTime() - b.start.getTime());
+
+  return (
+    <div style={{ border: '1px solid #edebe9', padding: '10px' }}>
+      {upcomingEvents.length === 0 && (
+        <div style={{ color: '#605e5c' }}>No upcoming events in next 30 days.</div>
+      )}
+      {upcomingEvents.map((event: ITimelineItem) => (
+        <div key={`agenda-${event.id}`} style={{ padding: '8px 0', borderBottom: '1px solid #f3f2f1' }}>
+          <div style={{ fontWeight: 600 }}>{event.title}</div>
+          <div style={{ fontSize: '12px', color: '#605e5c' }}>
+            {event.start.toLocaleString()} - {event.end.toLocaleString()}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const HorizonView: React.FC<{ events: ITimelineItem[] }> = ({ events }) => {
+  const today: Date = new Date();
+  const todayStart: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(190px, 1fr))', gap: '10px' }}>
+      {HORIZON_BLOCKS.map((block: IHorizonBlock) => {
+        const rangeStart: Date = addDays(todayStart, block.startOffsetDays);
+        const rangeEnd: Date = addDays(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate(), 23, 59, 59, 999), block.endOffsetDays);
+        const blockEvents: ITimelineItem[] = events
+          .filter((event: ITimelineItem) => event.start.getTime() >= rangeStart.getTime() && event.start.getTime() <= rangeEnd.getTime())
+          .sort((a: ITimelineItem, b: ITimelineItem) => a.start.getTime() - b.start.getTime());
+
+        return (
+          <div key={block.label} style={{ border: '1px solid #edebe9', borderRadius: '6px', padding: '10px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 600 }}>{block.label}</div>
+            <div style={{ fontSize: '28px', fontWeight: 700, margin: '8px 0' }}>{blockEvents.length}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {blockEvents.slice(0, 5).map((event: ITimelineItem) => (
+                <div key={`${block.label}-${event.id}`} style={{ fontSize: '12px' }}>
+                  <div style={{ fontWeight: 600 }}>{event.title}</div>
+                  <div style={{ color: '#605e5c' }}>{event.start.toLocaleDateString()}</div>
+                </div>
+              ))}
+              {blockEvents.length === 0 && (
+                <div style={{ fontSize: '12px', color: '#605e5c' }}>No events in this range.</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 function stripHtml(value: string): string {
   if (!value) {
     return '';
@@ -174,6 +262,12 @@ function isSameDay(firstDate: Date, secondDate: Date): boolean {
     firstDate.getMonth() === secondDate.getMonth() &&
     firstDate.getDate() === secondDate.getDate()
   );
+}
+
+function addDays(date: Date, days: number): Date {
+  const nextDate: Date = new Date(date.getTime());
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
 }
 
 export default TimelineCalendarTabbed;
