@@ -2,8 +2,8 @@
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
     "name": "Command Calendar V2",
-    "id": "fdcba3a4-d4a6-4ac7-a370-98c7d5d8e7db",
-    "version": "2.1.0.0",
+    "id": "533b3ab7-a176-4f49-bf54-775d582c95db",
+    "version": "2.1.1.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -48,8 +48,8 @@
       {
         "title": "command-calendar-v2 Feature",
         "description": "The feature that activates elements of the command-calendar-v2 solution.",
-        "id": "ab611fa5-0740-4d5f-8cf4-fdd0ab5fcdfa",
-        "version": "2.1.0.0"
+        "id": "5d62164e-8333-475b-8105-9abb6ed6fbae",
+        "version": "2.1.1.0"
       }
     ]
   },
