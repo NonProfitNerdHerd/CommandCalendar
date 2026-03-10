@@ -165,7 +165,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
     const nextSignature: string = mappedItems
       .map((eventItem: ITimelineItem) => (
-        `${eventItem.id}|${eventItem.start.getTime()}|${eventItem.end.getTime()}|${eventItem.title}|${eventItem.categoryKey}|${eventItem.calendarKey}|${eventItem.modified}`
+        `${eventItem.id}|${eventItem.start.getTime()}|${eventItem.end.getTime()}|${eventItem.title}|${eventItem.categoryKey}|${eventItem.calendarKey}|${eventItem.calendarLabel}|${eventItem.modified}`
       ))
       .join('~');
 
@@ -564,6 +564,7 @@ const CalendarView: React.FC<{ events: ITimelineItem[]; referenceDate: Date; mod
 const CalendarMonthGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date }> = ({ events, referenceDate }) => {
   const monthStart: Date = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
   const gridStart: Date = startOfWeek(monthStart, false);
+  const [expandedDayKeys, setExpandedDayKeys] = React.useState<string[]>([]);
   const gridDays: Date[] = [];
 
   for (let index = 0; index < 42; index++) {
@@ -581,6 +582,9 @@ const CalendarMonthGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date
         {gridDays.map((day: Date) => {
           const dayEvents: ITimelineItem[] = eventsForDate(events, day);
           const isCurrentMonth: boolean = day.getMonth() === monthStart.getMonth();
+          const dayKey = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+          const isExpanded = expandedDayKeys.indexOf(dayKey) > -1;
+          const visibleEvents = isExpanded ? dayEvents : dayEvents.slice(0, 4);
           return (
             <div
               key={`month-${day.toISOString()}`}
@@ -593,7 +597,7 @@ const CalendarMonthGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date
               }}
             >
               <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>{day.getDate()}</div>
-              {dayEvents.slice(0, 4).map((eventItem: ITimelineItem) => (
+              {visibleEvents.map((eventItem: ITimelineItem) => (
                 <EventLinkWithTooltip
                   key={`month-${day.toISOString()}-${eventItem.id}`}
                   event={eventItem}
@@ -601,7 +605,30 @@ const CalendarMonthGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date
                   showDateRange
                 />
               ))}
-              {dayEvents.length > 4 && <div style={{ fontSize: '11px', color: '#605e5c' }}>+{dayEvents.length - 4} more</div>}
+              {dayEvents.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandedDayKeys((previousKeys: string[]) => {
+                      if (previousKeys.indexOf(dayKey) > -1) {
+                        return previousKeys.filter((key: string) => key !== dayKey);
+                      }
+
+                      return [...previousKeys, dayKey];
+                    });
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0078d4',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    padding: 0
+                  }}
+                >
+                  {isExpanded ? 'Show less' : `+${dayEvents.length - 4} more`}
+                </button>
+              )}
             </div>
           );
         })}
@@ -679,7 +706,7 @@ const HorizonView: React.FC<{ events: ITimelineItem[] }> = ({ events }) => {
             <div style={{ fontSize: '16px', fontWeight: 600 }}>{block.label}</div>
             <div style={{ fontSize: '28px', fontWeight: 700, margin: '8px 0' }}>{blockEvents.length}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {blockEvents.slice(0, 5).map((eventItem: ITimelineItem) => (
+              {blockEvents.map((eventItem: ITimelineItem) => (
                 <div key={`${block.label}-${eventItem.id}`} style={{ fontSize: '12px' }}>
                   <EventLinkWithTooltip event={eventItem} />
                   <div style={{ color: '#605e5c', marginLeft: '14px' }}>{eventItem.start.toLocaleDateString()}</div>
@@ -990,15 +1017,16 @@ function resolveEventCategory(
 function resolveEventCalendar(item: any): ICalendarMeta {
   const sourceObj: any = item && item.sourceObj ? item.sourceObj : {};
   if (sourceObj.siteUrl && sourceObj.list) {
+    const displayLabel = String(sourceObj.displayName || sourceObj.listName || sourceObj.list || 'SharePoint Calendar');
     return {
       key: `sp|${sourceObj.siteUrl}|${sourceObj.list}`,
-      label: String(sourceObj.listName || sourceObj.list || 'SharePoint Calendar')
+      label: displayLabel
     };
   }
 
   if (sourceObj.resource) {
     const personaMail: string = sourceObj.persona && sourceObj.persona.length > 0 ? String(sourceObj.persona[0].mail || '') : '';
-    const label: string = String(sourceObj.resourceName || sourceObj.name || sourceObj.resource || personaMail || 'Outlook Calendar');
+    const label: string = String(sourceObj.displayName || sourceObj.resourceName || sourceObj.name || sourceObj.resource || personaMail || 'Outlook Calendar');
     return {
       key: `graph|${sourceObj.resource}|${personaMail}`,
       label

@@ -949,7 +949,10 @@ export default class TimelineCalendarWebPart extends BaseClientSideWebPart<ITime
                                 }
                                 
                                 //Finalize the change
+                                const previousListName = item.listName;
                                 item.listName = option.text;
+                                if (!item.displayName || item.displayName === previousListName)
+                                  item.displayName = option.text;
                                 onUpdate(field.id, option.key);
                               }
                             },
@@ -1320,6 +1323,16 @@ export default class TimelineCalendarWebPart extends BaseClientSideWebPart<ITime
                           })
                         )
                       }
+                    },
+                    {
+                      id: "displayName",
+                      title: "Calendar Display Name",
+                      disable: (item:IListItem):boolean => {
+                        return (item.list == null);
+                      },
+                      placeholder: "Optional custom name shown in filters",
+                      type: CustomCollectionFieldType.string,
+                      required: false
                     },
                     {
                       id: "view",  
@@ -2023,6 +2036,8 @@ export default class TimelineCalendarWebPart extends BaseClientSideWebPart<ITime
                               }
                               else {
                                 onUpdate(field.id, option.key);
+                                if (!item.displayName)
+                                  item.displayName = option.text as string;
 
                                 //For user calendars check for at least "view all details" permission or access denied error will be thrown getting events
                                 const persona = item.persona[0];
@@ -2153,6 +2168,16 @@ export default class TimelineCalendarWebPart extends BaseClientSideWebPart<ITime
                           })
                         )
                       }
+                    },
+                    {
+                      id: "displayName",
+                      title: "Calendar Display Name",
+                      disable: (item:ICalendarItem):boolean => {
+                        return (item.resource == null);
+                      },
+                      placeholder: "Optional custom name shown in filters",
+                      type: CustomCollectionFieldType.string,
+                      required: false
                     },
                     //Custom filter query for calendar items
                     {

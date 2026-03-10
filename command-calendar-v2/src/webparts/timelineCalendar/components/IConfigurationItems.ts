@@ -32,6 +32,7 @@ export interface ICalendarItem {
     sortIdx?: number //auto field
     persona: IPersonaProps[]
     resource: any
+    displayName?: string
     filter: string
     category: string
     //classField: string
@@ -85,6 +86,7 @@ export interface IListItem {
     siteUrl: string
     list: string
     listName: string //not filled by user
+    displayName?: string
     isCalendar: boolean //not filled by user
     view: string
     viewName: string //not filled by user
