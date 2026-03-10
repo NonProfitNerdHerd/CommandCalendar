@@ -58,6 +58,10 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
   const [agendaReferenceDate, setAgendaReferenceDate] = React.useState<Date>(startOfDay(new Date()));
   const eventsSignatureRef = React.useRef<string>('');
 
+  const timelineElement = React.useMemo((): JSX.Element => (
+    <TimelineCalendar {...props} selectedCategoryKeys={selectedCategoryKeys} hideLegendBar />
+  ), [props, selectedCategoryKeys]);
+
   const categoryMetaByKey = React.useMemo((): Map<string, ICategoryMeta> => {
     const nextMap: Map<string, ICategoryMeta> = new Map<string, ICategoryMeta>();
     const categories: any[] = props.categories || [];
@@ -85,6 +89,10 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
   }, [props.categories, props.buildDivStyles, props.ensureValidClassName]);
 
   const captureEvents = React.useCallback((): void => {
+    if (isLoadingData) {
+      return;
+    }
+
     const timelineGlobal: any = (window as any).TC;
     if (!timelineGlobal || !timelineGlobal.eventsDataSet || !timelineGlobal.eventsDataSet.get) {
       return;
@@ -152,7 +160,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
     eventsSignatureRef.current = nextSignature;
     setEvents(mappedItems);
-  }, [categoryMetaByKey, props.ensureValidClassName]);
+  }, [categoryMetaByKey, props.ensureValidClassName, isLoadingData]);
 
   const categoryFilterOptions: IDropdownOption[] = React.useMemo(() => {
     const optionMap: Map<string, ICategoryMeta> = new Map<string, ICategoryMeta>();
@@ -329,7 +337,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       )}
 
       <div style={{ display: activeView === 'gantt' ? 'block' : 'none' }}>
-        <TimelineCalendar {...props} selectedCategoryKeys={selectedCategoryKeys} hideLegendBar />
+        {timelineElement}
       </div>
       <div style={{ display: activeView === 'calendar' ? 'block' : 'none' }}>
         <CalendarView events={filteredEvents} referenceDate={calendarReferenceDate} mode={calendarMode} />
