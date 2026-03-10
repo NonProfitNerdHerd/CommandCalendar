@@ -1,6 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
-  "id": "673306f9-7967-4882-aa2c-fb7f4d366550",
+  "id": "3c0c9926-8a4f-483d-a5dd-112c656ecfab",
   "alias": "TimelineCalendarWebPart",
   "componentType": "WebPart",
 
