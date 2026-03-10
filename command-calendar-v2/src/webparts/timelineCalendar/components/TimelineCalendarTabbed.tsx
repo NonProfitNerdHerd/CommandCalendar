@@ -49,7 +49,7 @@ const HORIZON_BLOCKS: IHorizonBlock[] = [
 ];
 
 const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimelineCalendarProps) => {
-  const [activeView, setActiveView] = React.useState<TViewKey>('gantt');
+  const [activeView, setActiveView] = React.useState<TViewKey>('calendar');
   const [events, setEvents] = React.useState<ITimelineItem[]>([]);
   const [isLoadingData, setIsLoadingData] = React.useState<boolean>(true);
   const [selectedCategoryKeys, setSelectedCategoryKeys] = React.useState<string[]>([]);
@@ -270,10 +270,10 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
         }}
       >
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-          <TabButton isActive={activeView === 'gantt'} label="Gnatt Chart View" onClick={() => setActiveView('gantt')} />
           <TabButton isActive={activeView === 'calendar'} label="Calendar View" onClick={() => setActiveView('calendar')} />
-          <TabButton isActive={activeView === 'agenda'} label="Agenda View" onClick={() => setActiveView('agenda')} />
+          <TabButton isActive={activeView === 'gantt'} label="Gnatt Chart View" onClick={() => setActiveView('gantt')} />
           <TabButton isActive={activeView === 'horizon'} label="30-60-90-120 View" onClick={() => setActiveView('horizon')} />
+          <TabButton isActive={activeView === 'agenda'} label="Agenda View" onClick={() => setActiveView('agenda')} />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -665,21 +665,31 @@ const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean; 
   return (
     <TooltipHost content={tooltipContent} closeDelay={250}>
       <div>
-        {eventUrl ? (
-        <a
-          href={eventUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(eventClick: React.MouseEvent<HTMLAnchorElement>) => {
-            eventClick.preventDefault();
-            window.open(eventUrl, '_blank', 'noopener,noreferrer');
+      {eventUrl ? (
+        <button
+          type="button"
+          onClick={() => {
+            const popupWindow = window.open(eventUrl, '_blank', 'noopener,noreferrer');
+            if (popupWindow) {
+              popupWindow.opener = null;
+            }
           }}
-          style={{ ...textStyle, color: '#0078d4', textDecoration: 'none' }}
+          style={{
+            ...textStyle,
+            color: '#0078d4',
+            textDecoration: 'none',
+            border: 'none',
+            background: 'transparent',
+            padding: 0,
+            margin: 0,
+            textAlign: 'left',
+            cursor: 'pointer'
+          }}
         >
-            <CategoryDot color={event.categoryColor} />
-            {event.title}
-          </a>
-        ) : (
+          <CategoryDot color={event.categoryColor} />
+          {event.title}
+        </button>
+      ) : (
           <span style={{ ...textStyle, color: '#323130' }}>
             <CategoryDot color={event.categoryColor} />
             {event.title}
