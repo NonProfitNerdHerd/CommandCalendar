@@ -46,6 +46,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
   private _dsItems: any;
   private _dsGroups: any;
   private _isLoadingEvents: boolean = false;
+  private _externallyFilteredItems: any[] = [];
 
   /**
    * Called when component is mounted (only on the *initial* loading of the web part)
@@ -134,6 +135,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //this.context.domElement is undefined here
     const self = this;
     let reloadEvents = true;
+    const categoryFilterChanged = JSON.stringify(prevProps.selectedCategoryKeys || []) !== JSON.stringify(this.props.selectedCategoryKeys || []);
     //Check for specific property changes not requiring event reload
     // if (prevProps.categories != this.props.categories)
     //   reloadEvents = false;
@@ -270,6 +272,14 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       this.renderDynamicStyles();
       return;
     }
+    else if (prevProps.hideLegendBar != this.props.hideLegendBar) {
+      this.renderLegend();
+      const legendElem = document.getElementById("legend-" + this.props.instanceId);
+      if (legendElem) {
+        legendElem.style.display = (this.props.hideLegendBar ? "none" : "block");
+      }
+      return;
+    }
 
     //Handle categories/legend & groups
     //this._timeline.setOptions({})
@@ -287,6 +297,8 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Only re-render events if needed
     if (reloadEvents)
       this.renderEvents();
+    else if (categoryFilterChanged)
+      this.applyExternalCategoryFilter();
   }
 
   //Also fired after super.onPropertyPaneFieldChanged is called
@@ -1462,6 +1474,49 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     });
   }
 
+  private restoreExternallyFilteredItems(): void {
+    if (this._externallyFilteredItems.length > 0) {
+      this._dsItems.add(this._externallyFilteredItems);
+      this._externallyFilteredItems = [];
+    }
+  }
+
+  private applyExternalCategoryFilter(): void {
+    // Always restore first so filter changes can be re-applied cleanly
+    this.restoreExternallyFilteredItems();
+
+    const selectedCategoryKeys = this.props.selectedCategoryKeys || [];
+    if (selectedCategoryKeys.length === 0) {
+      return;
+    }
+
+    const itemsToHide = this._dsItems.get({
+      filter: function(item:any): boolean {
+        if (item.className === "weekend") {
+          return false;
+        }
+
+        if (!item.className || !item.className.split) {
+          return true;
+        }
+
+        const classNames = item.className.split(" ");
+        for (let idx = 0; idx < classNames.length; idx++) {
+          if (selectedCategoryKeys.indexOf(classNames[idx]) !== -1) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+    });
+
+    if (itemsToHide.length > 0) {
+      this._externallyFilteredItems = itemsToHide;
+      this._dsItems.remove(itemsToHide);
+    }
+  }
+
   private setGroups(): void {
     if (this.props.groups) {
       //Reformat array
@@ -1504,9 +1559,19 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Function: showLegend (must be delared before/above where it's called)
     const showLegend = ():void => {
       //Hide the loader image
-      document.getElementById("loading-" + this.props.instanceId).style.display = "none";
-      //Show the legend
-      document.getElementById("legend-" + this.props.instanceId).style.display = "block";
+      const loadingElem = document.getElementById("loading-" + this.props.instanceId);
+      if (loadingElem) {
+        loadingElem.style.display = "none";
+      }
+
+      //Show/hide the legend based on wrapper settings
+      const legendElem = document.getElementById("legend-" + this.props.instanceId);
+      if (legendElem) {
+        legendElem.style.display = (this.props.hideLegendBar ? "none" : "block");
+      }
+
+      //Apply any external category filtering after events are loaded
+      this.applyExternalCategoryFilter();
     }
 
     //Remove any existing events to prevent duplicate event adding (while in edit mode)

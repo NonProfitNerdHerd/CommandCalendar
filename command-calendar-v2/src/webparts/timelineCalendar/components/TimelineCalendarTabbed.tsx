@@ -174,7 +174,10 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
     return optionValues.map((meta: ICategoryMeta) => ({
       key: meta.key,
-      text: meta.label
+      text: meta.label,
+      data: {
+        color: meta.color
+      }
     }));
   }, [categoryMetaByKey, events]);
 
@@ -207,15 +210,9 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
   }, []);
 
   React.useEffect(() => {
-    if (activeView === 'gantt') {
-      return;
+    if (activeView !== 'gantt') {
+      captureEvents();
     }
-
-    const intervalId: number = window.setInterval(captureEvents, 1500);
-    captureEvents();
-    return () => {
-      window.clearInterval(intervalId);
-    };
   }, [activeView, captureEvents]);
 
   React.useEffect(() => {
@@ -237,23 +234,25 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
         <TabButton isActive={activeView === 'horizon'} label="30-60-90-120 View" onClick={() => setActiveView('horizon')} />
       </div>
 
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <Dropdown
+          label="Category filter"
+          placeholder="All categories"
+          multiSelect
+          options={categoryFilterOptions}
+          selectedKeys={selectedCategoryKeys}
+          onChange={onCategoryFilterChange}
+          styles={{ dropdown: { minWidth: 280 } }}
+        />
+        <SmallButton
+          label="Clear"
+          onClick={() => setSelectedCategoryKeys([])}
+          disabled={selectedCategoryKeys.length === 0}
+        />
+      </div>
+
       {activeView !== 'gantt' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <Dropdown
-            label="Category filter"
-            placeholder="All categories"
-            multiSelect
-            options={categoryFilterOptions}
-            selectedKeys={selectedCategoryKeys}
-            onChange={onCategoryFilterChange}
-            styles={{ dropdown: { minWidth: 280 } }}
-          />
-          <SmallButton
-            label="Clear"
-            onClick={() => setSelectedCategoryKeys([])}
-            disabled={selectedCategoryKeys.length === 0}
-          />
-        </div>
+        <CategoryLegend options={categoryFilterOptions} selectedCategoryKeys={selectedCategoryKeys} />
       )}
 
       {activeView === 'calendar' && (
@@ -287,7 +286,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       )}
 
       <div style={{ display: activeView === 'gantt' ? 'block' : 'none' }}>
-        <TimelineCalendar {...props} />
+        <TimelineCalendar {...props} selectedCategoryKeys={selectedCategoryKeys} hideLegendBar />
       </div>
       <div style={{ display: activeView === 'calendar' ? 'block' : 'none' }}>
         <CalendarView events={filteredEvents} referenceDate={calendarReferenceDate} mode={calendarMode} />
@@ -345,6 +344,35 @@ const SmallButton: React.FC<{ label: string; onClick: () => void; disabled?: boo
   </button>
 );
 
+const CategoryLegend: React.FC<{ options: IDropdownOption[]; selectedCategoryKeys: string[] }> = ({ options, selectedCategoryKeys }) => {
+  if (!options || options.length === 0) {
+    return null;
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
+      <span style={{ fontWeight: 600, fontSize: '12px' }}>Legend:</span>
+      {options.map((option: IDropdownOption) => {
+        const optionColor: string = option.data && option.data.color ? String(option.data.color) : '#8a8886';
+        const isDimmed: boolean = selectedCategoryKeys.length > 0 && selectedCategoryKeys.indexOf(String(option.key)) === -1;
+        return (
+          <span
+            key={`legend-${String(option.key)}`}
+            style={{
+              fontSize: '12px',
+              color: '#323130',
+              opacity: isDimmed ? 0.45 : 1
+            }}
+          >
+            <CategoryDot color={optionColor} />
+            {option.text}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 const CalendarView: React.FC<{ events: ITimelineItem[]; referenceDate: Date; mode: TCalendarMode }> = ({
   events,
   referenceDate,
@@ -390,7 +418,12 @@ const CalendarMonthGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date
             >
               <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>{day.getDate()}</div>
               {dayEvents.slice(0, 4).map((eventItem: ITimelineItem) => (
-                <EventLinkWithTooltip key={`month-${day.toISOString()}-${eventItem.id}`} event={eventItem} compact />
+                <EventLinkWithTooltip
+                  key={`month-${day.toISOString()}-${eventItem.id}`}
+                  event={eventItem}
+                  compact
+                  showDateRange
+                />
               ))}
               {dayEvents.length > 4 && <div style={{ fontSize: '11px', color: '#605e5c' }}>+{dayEvents.length - 4} more</div>}
             </div>
@@ -437,7 +470,12 @@ const CalendarWeekGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date;
             >
               {dayEvents.length === 0 && <div style={{ fontSize: '11px', color: '#8a8886' }}>No events</div>}
               {dayEvents.map((eventItem: ITimelineItem) => (
-                <EventLinkWithTooltip key={`week-${day.toISOString()}-${eventItem.id}`} event={eventItem} compact={false} />
+                <EventLinkWithTooltip
+                  key={`week-${day.toISOString()}-${eventItem.id}`}
+                  event={eventItem}
+                  compact={false}
+                  showDateRange
+                />
               ))}
             </div>
           );
@@ -504,7 +542,7 @@ const HorizonView: React.FC<{ events: ITimelineItem[] }> = ({ events }) => {
   );
 };
 
-const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean }> = ({ event, compact }) => {
+const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean; showDateRange?: boolean }> = ({ event, compact, showDateRange }) => {
   const eventUrl: string = getEventUrl(event);
   const tooltipContent: JSX.Element = (
     <div>
@@ -528,28 +566,49 @@ const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean }
   const textStyle: React.CSSProperties = compact ? {
     display: 'block',
     fontSize: '11px',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    marginBottom: '2px'
+    marginBottom: '2px',
+    lineHeight: '1.2'
   } : {
     display: 'block',
-    fontSize: '12px'
+    fontSize: '12px',
+    lineHeight: '1.2'
+  };
+
+  const dateRangeTextStyle: React.CSSProperties = compact ? {
+    display: 'block',
+    fontSize: '10px',
+    color: '#605e5c',
+    marginLeft: '14px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  } : {
+    display: 'block',
+    fontSize: '11px',
+    color: '#605e5c',
+    marginLeft: '14px'
   };
 
   return (
-    <TooltipHost content={tooltipContent}>
-      {eventUrl ? (
-        <a href={eventUrl} target="_blank" rel="noopener noreferrer" style={{ ...textStyle, color: '#0078d4', textDecoration: 'none' }}>
-          <CategoryDot color={event.categoryColor} />
-          {event.title}
-        </a>
-      ) : (
-        <span style={{ ...textStyle, color: '#323130' }}>
-          <CategoryDot color={event.categoryColor} />
-          {event.title}
-        </span>
-      )}
+    <TooltipHost content={tooltipContent} closeDelay={250}>
+      <div>
+        {eventUrl ? (
+          <a href={eventUrl} target="_blank" rel="noopener noreferrer" style={{ ...textStyle, color: '#0078d4', textDecoration: 'none' }}>
+            <CategoryDot color={event.categoryColor} />
+            {event.title}
+          </a>
+        ) : (
+          <span style={{ ...textStyle, color: '#323130' }}>
+            <CategoryDot color={event.categoryColor} />
+            {event.title}
+          </span>
+        )}
+        {showDateRange && (
+          <span style={dateRangeTextStyle}>
+            {event.start.toLocaleString()} - {event.end.toLocaleString()}
+          </span>
+        )}
+      </div>
     </TooltipHost>
   );
 };

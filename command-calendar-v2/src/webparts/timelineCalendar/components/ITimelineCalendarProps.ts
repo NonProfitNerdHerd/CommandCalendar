@@ -37,4 +37,6 @@ export interface ITimelineCalendarProps {
   tooltipEditor: string;
   visJsonProperties: string;
   cssOverrides: string;
+  selectedCategoryKeys?: string[];
+  hideLegendBar?: boolean;
 }
