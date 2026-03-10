@@ -383,20 +383,50 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       )}
 
       {activeView === 'calendar' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <SmallButton
-            label="Last Month"
-            onClick={() => setCalendarReferenceDate(addMonths(calendarReferenceDate, -1))}
-          />
-          <SmallButton label="Today" onClick={() => setCalendarReferenceDate(startOfDay(new Date()))} />
-          <SmallButton
-            label="Next Month"
-            onClick={() => setCalendarReferenceDate(addMonths(calendarReferenceDate, 1))}
-          />
-          <div style={{ fontWeight: 600, marginLeft: '8px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px'
+          }}
+        >
+          <div style={{ display: 'flex', gap: '8px', justifySelf: 'start' }}>
+            <SmallButton
+              label={calendarMode === 'month' ? 'Last Month' : 'Previous Week'}
+              onClick={() => {
+                if (calendarMode === 'month') {
+                  setCalendarReferenceDate(addMonths(calendarReferenceDate, -1));
+                } else {
+                  setCalendarReferenceDate(addDays(calendarReferenceDate, -7));
+                }
+              }}
+            />
+            <SmallButton label="Today" onClick={() => setCalendarReferenceDate(startOfDay(new Date()))} />
+            <SmallButton
+              label={calendarMode === 'month' ? 'Next Month' : 'Next Week'}
+              onClick={() => {
+                if (calendarMode === 'month') {
+                  setCalendarReferenceDate(addMonths(calendarReferenceDate, 1));
+                } else {
+                  setCalendarReferenceDate(addDays(calendarReferenceDate, 7));
+                }
+              }}
+            />
+          </div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: '3em',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              lineHeight: 1.1
+            }}
+          >
             {buildCalendarTitle(calendarReferenceDate, calendarMode)}
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', justifySelf: 'end' }}>
             <SmallButton label="Month" onClick={() => setCalendarMode('month')} isActive={calendarMode === 'month'} />
             <SmallButton label="7-Day Week" onClick={() => setCalendarMode('week7')} isActive={calendarMode === 'week7'} />
             <SmallButton label="5-Day Week" onClick={() => setCalendarMode('week5')} isActive={calendarMode === 'week5'} />
