@@ -243,28 +243,38 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-        <TabButton isActive={activeView === 'gantt'} label="Gnatt Chart View" onClick={() => setActiveView('gantt')} />
-        <TabButton isActive={activeView === 'calendar'} label="Calendar View" onClick={() => setActiveView('calendar')} />
-        <TabButton isActive={activeView === 'agenda'} label="Agenda View" onClick={() => setActiveView('agenda')} />
-        <TabButton isActive={activeView === 'horizon'} label="30-60-90-120 View" onClick={() => setActiveView('horizon')} />
-      </div>
+      <div
+        style={{
+          background: '#f5f5f5',
+          border: '1px solid #edebe9',
+          borderRadius: '6px',
+          padding: '10px',
+          marginBottom: '10px'
+        }}
+      >
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <TabButton isActive={activeView === 'gantt'} label="Gnatt Chart View" onClick={() => setActiveView('gantt')} />
+          <TabButton isActive={activeView === 'calendar'} label="Calendar View" onClick={() => setActiveView('calendar')} />
+          <TabButton isActive={activeView === 'agenda'} label="Agenda View" onClick={() => setActiveView('agenda')} />
+          <TabButton isActive={activeView === 'horizon'} label="30-60-90-120 View" onClick={() => setActiveView('horizon')} />
+        </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <Dropdown
-          label="Category filter"
-          placeholder="All categories"
-          multiSelect
-          options={categoryFilterOptions}
-          selectedKeys={selectedCategoryKeys}
-          onChange={onCategoryFilterChange}
-          styles={{ dropdown: { minWidth: 280 } }}
-        />
-        <SmallButton
-          label="Clear"
-          onClick={() => setSelectedCategoryKeys([])}
-          disabled={selectedCategoryKeys.length === 0}
-        />
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <Dropdown
+            label="Category filter"
+            placeholder="All categories"
+            multiSelect
+            options={categoryFilterOptions}
+            selectedKeys={selectedCategoryKeys}
+            onChange={onCategoryFilterChange}
+            styles={{ dropdown: { minWidth: 280 } }}
+          />
+          <SmallButton
+            label="Clear"
+            onClick={() => setSelectedCategoryKeys([])}
+            disabled={selectedCategoryKeys.length === 0}
+          />
+        </div>
       </div>
 
       {activeView !== 'gantt' && (
@@ -326,8 +336,9 @@ const TabButton: React.FC<{ isActive: boolean; label: string; onClick: () => voi
       background: isActive ? '#eff6fc' : '#fff',
       color: isActive ? '#0078d4' : '#323130',
       borderRadius: '4px',
-      padding: '6px 12px',
-      fontWeight: isActive ? 600 : 400,
+      padding: '10px 14px',
+      fontSize: '1.5em',
+      fontWeight: 700,
       cursor: 'pointer'
     }}
   >
