@@ -609,7 +609,16 @@ const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean; 
     <TooltipHost content={tooltipContent} closeDelay={250}>
       <div>
         {eventUrl ? (
-          <a href={eventUrl} target="_blank" rel="noopener noreferrer" style={{ ...textStyle, color: '#0078d4', textDecoration: 'none' }}>
+        <a
+          href={eventUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(eventClick: React.MouseEvent<HTMLAnchorElement>) => {
+            eventClick.preventDefault();
+            window.open(eventUrl, '_blank', 'noopener,noreferrer');
+          }}
+          style={{ ...textStyle, color: '#0078d4', textDecoration: 'none' }}
+        >
             <CategoryDot color={event.categoryColor} />
             {event.title}
           </a>
