@@ -28,6 +28,7 @@ const HORIZON_BLOCKS: IHorizonBlock[] = [
 const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimelineCalendarProps) => {
   const [activeView, setActiveView] = React.useState<TViewKey>('gantt');
   const [events, setEvents] = React.useState<ITimelineItem[]>([]);
+  const eventsSignatureRef = React.useRef<string>('');
 
   const captureEvents = React.useCallback((): void => {
     const timelineGlobal: any = (window as any).TC;
@@ -57,16 +58,30 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       })
       .sort((a: ITimelineItem, b: ITimelineItem) => a.start.getTime() - b.start.getTime());
 
+    const nextSignature: string = mappedItems
+      .map((event: ITimelineItem) => `${event.id}|${event.start.getTime()}|${event.end.getTime()}|${event.title}`)
+      .join('~');
+
+    if (eventsSignatureRef.current === nextSignature) {
+      return;
+    }
+
+    eventsSignatureRef.current = nextSignature;
     setEvents(mappedItems);
   }, []);
 
   React.useEffect(() => {
+    if (activeView === 'gantt') {
+      return;
+    }
+
     const intervalId: number = window.setInterval(captureEvents, 1500);
     captureEvents();
+
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [captureEvents]);
+  }, [activeView, captureEvents]);
 
   React.useEffect(() => {
     if (activeView === 'gantt') {
