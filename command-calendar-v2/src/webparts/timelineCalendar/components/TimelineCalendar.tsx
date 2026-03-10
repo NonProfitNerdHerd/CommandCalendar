@@ -48,6 +48,15 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
   private _isLoadingEvents: boolean = false;
   private _externallyFilteredItems: any[] = [];
 
+  private notifyLoadingState(isLoading: boolean): void {
+    window.dispatchEvent(new CustomEvent("command-calendar-loading", {
+      detail: {
+        instanceId: this.props.instanceId,
+        isLoading
+      }
+    }));
+  }
+
   /**
    * Called when component is mounted (only on the *initial* loading of the web part)
    */
@@ -1555,6 +1564,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     }
     console.log("TimelineCalendar: Starting renderEvents()");
     this._isLoadingEvents = true;
+    this.notifyLoadingState(true);
 
     //Function: showLegend (must be delared before/above where it's called)
     const showLegend = ():void => {
@@ -1605,11 +1615,13 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       console.log("TimelineCalendar: Events loaded successfully");
       showLegend();
       this._isLoadingEvents = false;
+      this.notifyLoadingState(false);
     }).catch(error => {
       //Ensure flag is cleared even on error
       console.error("TimelineCalendar: Error loading events:", error);
       this._isLoadingEvents = false;
       showLegend();
+      this.notifyLoadingState(false);
     });
   }
 

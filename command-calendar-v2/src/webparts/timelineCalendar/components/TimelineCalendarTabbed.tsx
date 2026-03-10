@@ -51,6 +51,7 @@ const HORIZON_BLOCKS: IHorizonBlock[] = [
 const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimelineCalendarProps) => {
   const [activeView, setActiveView] = React.useState<TViewKey>('gantt');
   const [events, setEvents] = React.useState<ITimelineItem[]>([]);
+  const [isLoadingData, setIsLoadingData] = React.useState<boolean>(true);
   const [selectedCategoryKeys, setSelectedCategoryKeys] = React.useState<string[]>([]);
   const [calendarReferenceDate, setCalendarReferenceDate] = React.useState<Date>(startOfDay(new Date()));
   const [calendarMode, setCalendarMode] = React.useState<TCalendarMode>('month');
@@ -241,8 +242,24 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
     }
   }, [activeView, captureEvents]);
 
+  React.useEffect(() => {
+    const handleLoadingEvent = (event: Event): void => {
+      const customEvent = event as CustomEvent;
+      if (!customEvent.detail || customEvent.detail.instanceId !== props.instanceId) {
+        return;
+      }
+
+      setIsLoadingData(!!customEvent.detail.isLoading);
+    };
+
+    window.addEventListener('command-calendar-loading', handleLoadingEvent);
+    return () => {
+      window.removeEventListener('command-calendar-loading', handleLoadingEvent);
+    };
+  }, [props.instanceId]);
+
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <div
         style={{
           background: '#f5f5f5',
@@ -323,6 +340,35 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       <div style={{ display: activeView === 'horizon' ? 'block' : 'none' }}>
         <HorizonView events={filteredEvents} />
       </div>
+
+      {isLoadingData && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            zIndex: 1000,
+            background: 'rgba(245, 245, 245, 0.86)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              border: '1px solid #d0d0d0',
+              borderRadius: '6px',
+              padding: '14px 20px',
+              fontWeight: 700
+            }}
+          >
+            loading data, please wait
+          </div>
+        </div>
+      )}
     </div>
   );
 };
