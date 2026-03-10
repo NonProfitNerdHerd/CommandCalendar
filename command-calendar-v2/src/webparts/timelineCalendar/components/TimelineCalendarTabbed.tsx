@@ -705,6 +705,7 @@ const EventLinkWithTooltip: React.FC<{ event: ITimelineItem; compact?: boolean; 
       <div><b>Category:</b> {event.categoryText || event.categoryLabel || '-'}</div>
       <div><b>Start:</b> {event.start.toLocaleString()}</div>
       <div><b>End:</b> {event.end.toLocaleString()}</div>
+      <div><b>Calendar:</b> {event.calendarLabel || '-'}</div>
       <div><b>Description:</b> {limitText(event.description || '-', 220)}</div>
       {(event.author || event.editor || event.modified) && (
         <div style={{ marginTop: '6px', paddingTop: '4px', borderTop: '1px solid #edebe9' }}>
