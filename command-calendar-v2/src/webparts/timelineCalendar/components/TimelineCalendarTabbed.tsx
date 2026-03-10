@@ -130,7 +130,14 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
           objType: String(item.objType || '')
         };
       })
-      .sort((firstEvent: ITimelineItem, secondEvent: ITimelineItem) => firstEvent.start.getTime() - secondEvent.start.getTime());
+      .sort((firstEvent: ITimelineItem, secondEvent: ITimelineItem) => {
+        const startDiff: number = firstEvent.start.getTime() - secondEvent.start.getTime();
+        if (startDiff !== 0) {
+          return startDiff;
+        }
+
+        return String(firstEvent.id).localeCompare(String(secondEvent.id));
+      });
 
     const nextSignature: string = mappedItems
       .map((eventItem: ITimelineItem) => (
@@ -210,9 +217,18 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
   }, []);
 
   React.useEffect(() => {
-    if (activeView !== 'gantt') {
-      captureEvents();
+    if (activeView === 'gantt') {
+      return;
     }
+
+    captureEvents();
+    const intervalId: number = window.setInterval(() => {
+      captureEvents();
+    }, 2000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, [activeView, captureEvents]);
 
   React.useEffect(() => {
