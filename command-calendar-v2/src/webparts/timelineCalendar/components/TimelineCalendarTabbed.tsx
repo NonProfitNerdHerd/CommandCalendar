@@ -4,7 +4,7 @@ import { ITimelineCalendarProps } from './ITimelineCalendarProps';
 import { Dropdown, IDropdownOption } from 'office-ui-fabric-react/lib/Dropdown';
 import { TooltipHost } from 'office-ui-fabric-react/lib/Tooltip';
 
-type TViewKey = 'gantt' | 'calendar' | 'agenda' | 'horizon';
+type TViewKey = 'gantt' | 'calendar' | 'horizon';
 type TCalendarMode = 'month' | 'week7' | 'week5';
 
 interface ITimelineItem {
@@ -25,12 +25,19 @@ interface ITimelineItem {
   encodedAbsUrl: string;
   spId: string;
   objType: string;
+  calendarKey: string;
+  calendarLabel: string;
 }
 
 interface ICategoryMeta {
   key: string;
   label: string;
   color: string;
+}
+
+interface ICalendarMeta {
+  key: string;
+  label: string;
 }
 
 interface IHorizonBlock {
@@ -53,14 +60,19 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
   const [events, setEvents] = React.useState<ITimelineItem[]>([]);
   const [isLoadingData, setIsLoadingData] = React.useState<boolean>(true);
   const [selectedCategoryKeys, setSelectedCategoryKeys] = React.useState<string[]>([]);
+  const [selectedCalendarKeys, setSelectedCalendarKeys] = React.useState<string[]>([]);
   const [calendarReferenceDate, setCalendarReferenceDate] = React.useState<Date>(startOfDay(new Date()));
   const [calendarMode, setCalendarMode] = React.useState<TCalendarMode>('month');
-  const [agendaReferenceDate, setAgendaReferenceDate] = React.useState<Date>(startOfDay(new Date()));
   const eventsSignatureRef = React.useRef<string>('');
 
   const timelineElement = React.useMemo((): JSX.Element => (
-    <TimelineCalendar {...props} selectedCategoryKeys={selectedCategoryKeys} hideLegendBar />
-  ), [props, selectedCategoryKeys]);
+    <TimelineCalendar
+      {...props}
+      selectedCategoryKeys={selectedCategoryKeys}
+      selectedCalendarKeys={selectedCalendarKeys}
+      hideLegendBar
+    />
+  ), [props, selectedCategoryKeys, selectedCalendarKeys]);
 
   const categoryMetaByKey = React.useMemo((): Map<string, ICategoryMeta> => {
     const nextMap: Map<string, ICategoryMeta> = new Map<string, ICategoryMeta>();
@@ -112,6 +124,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
         const end: Date = isNaN(parsedEnd.getTime()) || parsedEnd.getTime() < start.getTime() ? start : parsedEnd;
         const title: string = stripHtml(item.content || item.title || '(Untitled)');
         const categoryFromItem: ICategoryMeta = resolveEventCategory(item, categoryMetaByKey, props.ensureValidClassName);
+        const calendarFromItem = resolveEventCalendar(item);
         const location: string = stripHtml(String(item.Location || ''));
         const categoryText: string = stripHtml(String(item.Category || item.category || categoryFromItem.label || ''));
         const description: string = stripHtml(String(item.Description || ''));
@@ -136,7 +149,9 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
           eventUrl: extractEventUrlFromRaw(item),
           encodedAbsUrl: String(item.encodedAbsUrl || ''),
           spId: String(item.spId || ''),
-          objType: String(item.objType || '')
+          objType: String(item.objType || ''),
+          calendarKey: calendarFromItem.key,
+          calendarLabel: calendarFromItem.label
         };
       })
       .sort((firstEvent: ITimelineItem, secondEvent: ITimelineItem) => {
@@ -150,7 +165,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
     const nextSignature: string = mappedItems
       .map((eventItem: ITimelineItem) => (
-        `${eventItem.id}|${eventItem.start.getTime()}|${eventItem.end.getTime()}|${eventItem.title}|${eventItem.categoryKey}|${eventItem.modified}`
+        `${eventItem.id}|${eventItem.start.getTime()}|${eventItem.end.getTime()}|${eventItem.title}|${eventItem.categoryKey}|${eventItem.calendarKey}|${eventItem.modified}`
       ))
       .join('~');
 
@@ -197,14 +212,45 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
     }));
   }, [categoryMetaByKey, events]);
 
-  const filteredEvents: ITimelineItem[] = React.useMemo(() => {
-    if (selectedCategoryKeys.length === 0) {
-      return events;
-    }
+  const calendarFilterOptions: IDropdownOption[] = React.useMemo(() => {
+    const optionMap: Map<string, string> = new Map<string, string>();
 
-    const selectedKeySet: Set<string> = new Set<string>(selectedCategoryKeys);
-    return events.filter((eventItem: ITimelineItem) => eventItem.categoryKey && selectedKeySet.has(eventItem.categoryKey));
-  }, [events, selectedCategoryKeys]);
+    events.forEach((eventItem: ITimelineItem) => {
+      if (!eventItem.calendarKey || !eventItem.calendarLabel) {
+        return;
+      }
+
+      if (!optionMap.has(eventItem.calendarKey)) {
+        optionMap.set(eventItem.calendarKey, eventItem.calendarLabel);
+      }
+    });
+
+    const options: IDropdownOption[] = [];
+    optionMap.forEach((label: string, key: string) => {
+      options.push({
+        key,
+        text: label
+      });
+    });
+
+    options.sort((firstOption: IDropdownOption, secondOption: IDropdownOption) =>
+      String(firstOption.text).localeCompare(String(secondOption.text))
+    );
+    return options;
+  }, [events]);
+
+  const filteredEvents: ITimelineItem[] = React.useMemo(() => {
+    const selectedCategoryKeySet: Set<string> = new Set<string>(selectedCategoryKeys);
+    const selectedCalendarKeySet: Set<string> = new Set<string>(selectedCalendarKeys);
+
+    return events.filter((eventItem: ITimelineItem) => {
+      const categoryMatch = selectedCategoryKeys.length === 0 ||
+        (eventItem.categoryKey && selectedCategoryKeySet.has(eventItem.categoryKey));
+      const calendarMatch = selectedCalendarKeys.length === 0 ||
+        (eventItem.calendarKey && selectedCalendarKeySet.has(eventItem.calendarKey));
+      return categoryMatch && calendarMatch;
+    });
+  }, [events, selectedCategoryKeys, selectedCalendarKeys]);
 
   const onCategoryFilterChange = React.useCallback((event: React.FormEvent<HTMLDivElement>, option?: IDropdownOption): void => {
     if (!option) {
@@ -213,6 +259,25 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
 
     const optionKey: string = String(option.key);
     setSelectedCategoryKeys((previousKeys: string[]) => {
+      if (option.selected) {
+        if (previousKeys.indexOf(optionKey) > -1) {
+          return previousKeys;
+        }
+
+        return [...previousKeys, optionKey];
+      }
+
+      return previousKeys.filter((key: string) => key !== optionKey);
+    });
+  }, []);
+
+  const onCalendarFilterChange = React.useCallback((event: React.FormEvent<HTMLDivElement>, option?: IDropdownOption): void => {
+    if (!option) {
+      return;
+    }
+
+    const optionKey: string = String(option.key);
+    setSelectedCalendarKeys((previousKeys: string[]) => {
       if (option.selected) {
         if (previousKeys.indexOf(optionKey) > -1) {
           return previousKeys;
@@ -281,7 +346,6 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
           <TabButton isActive={activeView === 'calendar'} label="Calendar View" onClick={() => setActiveView('calendar')} />
           <TabButton isActive={activeView === 'gantt'} label="Gnatt Chart View" onClick={() => setActiveView('gantt')} />
           <TabButton isActive={activeView === 'horizon'} label="30-60-90-120 View" onClick={() => setActiveView('horizon')} />
-          <TabButton isActive={activeView === 'agenda'} label="Agenda View" onClick={() => setActiveView('agenda')} />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -294,10 +358,22 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
             onChange={onCategoryFilterChange}
             styles={{ dropdown: { minWidth: 280 } }}
           />
+          <Dropdown
+            label="Calendar filter"
+            placeholder="All calendars"
+            multiSelect
+            options={calendarFilterOptions}
+            selectedKeys={selectedCalendarKeys}
+            onChange={onCalendarFilterChange}
+            styles={{ dropdown: { minWidth: 280 } }}
+          />
           <SmallButton
-            label="Clear"
-            onClick={() => setSelectedCategoryKeys([])}
-            disabled={selectedCategoryKeys.length === 0}
+            label="Clear Filters"
+            onClick={() => {
+              setSelectedCategoryKeys([]);
+              setSelectedCalendarKeys([]);
+            }}
+            disabled={selectedCategoryKeys.length === 0 && selectedCalendarKeys.length === 0}
           />
         </div>
       </div>
@@ -307,7 +383,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       )}
 
       {activeView === 'calendar' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
           <SmallButton
             label="Last Month"
             onClick={() => setCalendarReferenceDate(addMonths(calendarReferenceDate, -1))}
@@ -317,22 +393,14 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
             label="Next Month"
             onClick={() => setCalendarReferenceDate(addMonths(calendarReferenceDate, 1))}
           />
-          <div style={{ width: '12px' }} />
-          <SmallButton label="Month" onClick={() => setCalendarMode('month')} isActive={calendarMode === 'month'} />
-          <SmallButton label="7-Day Week" onClick={() => setCalendarMode('week7')} isActive={calendarMode === 'week7'} />
-          <SmallButton label="5-Day Week" onClick={() => setCalendarMode('week5')} isActive={calendarMode === 'week5'} />
-          <div style={{ fontWeight: 600, alignSelf: 'center', marginLeft: '8px' }}>
+          <div style={{ fontWeight: 600, marginLeft: '8px' }}>
             {buildCalendarTitle(calendarReferenceDate, calendarMode)}
           </div>
-        </div>
-      )}
-
-      {activeView === 'agenda' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <SmallButton label="Prev Day" onClick={() => setAgendaReferenceDate(addDays(agendaReferenceDate, -1))} />
-          <SmallButton label="Today" onClick={() => setAgendaReferenceDate(startOfDay(new Date()))} />
-          <SmallButton label="Next Day" onClick={() => setAgendaReferenceDate(addDays(agendaReferenceDate, 1))} />
-          <div style={{ fontWeight: 600, marginLeft: '8px' }}>{agendaReferenceDate.toLocaleDateString()}</div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+            <SmallButton label="Month" onClick={() => setCalendarMode('month')} isActive={calendarMode === 'month'} />
+            <SmallButton label="7-Day Week" onClick={() => setCalendarMode('week7')} isActive={calendarMode === 'week7'} />
+            <SmallButton label="5-Day Week" onClick={() => setCalendarMode('week5')} isActive={calendarMode === 'week5'} />
+          </div>
         </div>
       )}
 
@@ -341,9 +409,6 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
       </div>
       <div style={{ display: activeView === 'calendar' ? 'block' : 'none' }}>
         <CalendarView events={filteredEvents} referenceDate={calendarReferenceDate} mode={calendarMode} />
-      </div>
-      <div style={{ display: activeView === 'agenda' ? 'block' : 'none' }}>
-        <AgendaView events={filteredEvents} referenceDate={agendaReferenceDate} />
       </div>
       <div style={{ display: activeView === 'horizon' ? 'block' : 'none' }}>
         <HorizonView events={filteredEvents} />
@@ -562,28 +627,6 @@ const CalendarWeekGrid: React.FC<{ events: ITimelineItem[]; referenceDate: Date;
           );
         })}
       </div>
-    </div>
-  );
-};
-
-const AgendaView: React.FC<{ events: ITimelineItem[]; referenceDate: Date }> = ({ events, referenceDate }) => {
-  const dayEvents: ITimelineItem[] = eventsForDate(events, referenceDate)
-    .slice()
-    .sort((firstEvent: ITimelineItem, secondEvent: ITimelineItem) => firstEvent.start.getTime() - secondEvent.start.getTime());
-
-  return (
-    <div style={{ border: '1px solid #edebe9', padding: '10px' }}>
-      {dayEvents.length === 0 && (
-        <div style={{ color: '#605e5c' }}>No events for {referenceDate.toLocaleDateString()}.</div>
-      )}
-      {dayEvents.map((eventItem: ITimelineItem) => (
-        <div key={`agenda-${eventItem.id}`} style={{ padding: '8px 0', borderBottom: '1px solid #f3f2f1' }}>
-          <EventLinkWithTooltip event={eventItem} />
-          <div style={{ fontSize: '12px', color: '#605e5c', marginLeft: '14px' }}>
-            {eventItem.start.toLocaleString()} - {eventItem.end.toLocaleString()}
-          </div>
-        </div>
-      ))}
     </div>
   );
 };
@@ -910,6 +953,31 @@ function resolveEventCategory(
     key: '',
     label: '',
     color: '#8a8886'
+  };
+}
+
+function resolveEventCalendar(item: any): ICalendarMeta {
+  const sourceObj: any = item && item.sourceObj ? item.sourceObj : {};
+  if (sourceObj.siteUrl && sourceObj.list) {
+    return {
+      key: `sp|${sourceObj.siteUrl}|${sourceObj.list}`,
+      label: String(sourceObj.listName || sourceObj.list || 'SharePoint Calendar')
+    };
+  }
+
+  if (sourceObj.resource) {
+    const personaMail: string = sourceObj.persona && sourceObj.persona.length > 0 ? String(sourceObj.persona[0].mail || '') : '';
+    const label: string = String(sourceObj.resourceName || sourceObj.name || sourceObj.resource || personaMail || 'Outlook Calendar');
+    return {
+      key: `graph|${sourceObj.resource}|${personaMail}`,
+      label
+    };
+  }
+
+  const fallbackLabel: string = String(sourceObj.listName || sourceObj.group || sourceObj.name || 'Calendar');
+  return {
+    key: `name|${fallbackLabel}`,
+    label: fallbackLabel
   };
 }
 

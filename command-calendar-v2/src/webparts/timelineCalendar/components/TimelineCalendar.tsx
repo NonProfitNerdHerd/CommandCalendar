@@ -145,6 +145,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     const self = this;
     let reloadEvents = true;
     const categoryFilterChanged = JSON.stringify(prevProps.selectedCategoryKeys || []) !== JSON.stringify(this.props.selectedCategoryKeys || []);
+    const calendarFilterChanged = JSON.stringify(prevProps.selectedCalendarKeys || []) !== JSON.stringify(this.props.selectedCalendarKeys || []);
     //Check for specific property changes not requiring event reload
     // if (prevProps.categories != this.props.categories)
     //   reloadEvents = false;
@@ -289,6 +290,9 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       }
       return;
     }
+    else if (categoryFilterChanged || calendarFilterChanged) {
+      reloadEvents = false;
+    }
 
     //Handle categories/legend & groups
     //this._timeline.setOptions({})
@@ -306,7 +310,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Only re-render events if needed
     if (reloadEvents)
       this.renderEvents();
-    else if (categoryFilterChanged)
+    else if (categoryFilterChanged || calendarFilterChanged)
       this.applyExternalCategoryFilter();
   }
 
@@ -1495,28 +1499,40 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     this.restoreExternallyFilteredItems();
 
     const selectedCategoryKeys = this.props.selectedCategoryKeys || [];
-    if (selectedCategoryKeys.length === 0) {
+    const selectedCalendarKeys = this.props.selectedCalendarKeys || [];
+    if (selectedCategoryKeys.length === 0 && selectedCalendarKeys.length === 0) {
       return;
     }
 
+    const self = this;
     const itemsToHide = this._dsItems.get({
       filter: function(item:any): boolean {
         if (item.className === "weekend") {
           return false;
         }
 
-        if (!item.className || !item.className.split) {
-          return true;
-        }
-
-        const classNames = item.className.split(" ");
-        for (let idx = 0; idx < classNames.length; idx++) {
-          if (selectedCategoryKeys.indexOf(classNames[idx]) !== -1) {
-            return false;
+        let categoryMatches = (selectedCategoryKeys.length === 0);
+        if (!categoryMatches) {
+          if (item.className && item.className.split) {
+            const classNames = item.className.split(" ");
+            for (let idx = 0; idx < classNames.length; idx++) {
+              if (selectedCategoryKeys.indexOf(classNames[idx]) !== -1) {
+                categoryMatches = true;
+                break;
+              }
+            }
           }
         }
 
-        return true;
+        let calendarMatches = (selectedCalendarKeys.length === 0);
+        if (!calendarMatches) {
+          const calendarKey = self.getCalendarFilterKey(item);
+          if (calendarKey && selectedCalendarKeys.indexOf(calendarKey) !== -1) {
+            calendarMatches = true;
+          }
+        }
+
+        return !(categoryMatches && calendarMatches);
       }
     });
 
@@ -1524,6 +1540,25 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       this._externallyFilteredItems = itemsToHide;
       this._dsItems.remove(itemsToHide);
     }
+  }
+
+  private getCalendarFilterKey(item:any): string {
+    const sourceObj = item && item.sourceObj ? item.sourceObj : null;
+    if (!sourceObj) {
+      return "";
+    }
+
+    if (sourceObj.siteUrl && sourceObj.list) {
+      return `sp|${sourceObj.siteUrl}|${sourceObj.list}`;
+    }
+
+    if (sourceObj.resource) {
+      const personaMail = sourceObj.persona && sourceObj.persona.length > 0 ? sourceObj.persona[0].mail : "";
+      return `graph|${sourceObj.resource}|${personaMail}`;
+    }
+
+    const fallback = sourceObj.listName || sourceObj.resource || sourceObj.group || "";
+    return fallback ? `name|${fallback}` : "";
   }
 
   private setGroups(): void {

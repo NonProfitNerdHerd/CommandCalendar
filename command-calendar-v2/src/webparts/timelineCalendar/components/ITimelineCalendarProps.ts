@@ -38,5 +38,6 @@ export interface ITimelineCalendarProps {
   visJsonProperties: string;
   cssOverrides: string;
   selectedCategoryKeys?: string[];
+  selectedCalendarKeys?: string[];
   hideLegendBar?: boolean;
 }
