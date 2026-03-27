@@ -1,66 +1,146 @@
-# Timeline Calendar
+# Command Calendar V2
 
-## ℹ️ Summary
+SharePoint Framework (SPFx) web part that aggregates **SharePoint** list/classic calendar data and **Microsoft 365 / Outlook** calendars (including **group** calendars) into a single, filterable experience. This project extends the open-source [**Timeline Calendar**](https://github.com/spsprinkles/timeline-calendar) with a **tabbed UI**, **Gantt-style timelines**, **Outlook-like calendar grids**, **upcoming-items horizons**, **rich filtering**, and **print-to-PDF** for calendar views.
 
 ![SPFx 1.17.2](https://img.shields.io/badge/SPFx-1.17.2-green.svg)
 ![Node.js v16](https://img.shields.io/badge/Node.js-v16-green.svg)
 ![SPO](https://img.shields.io/badge/SharePoint%20Online-Compatible-green.svg)
 
-The Timeline Calendar web part can pull in data from multiple sources and render them together in a dynamic, filterable timeline view. This includes **SharePoint** lists (and "classic" calendars) as well as **Outlook** calendars (including **Microsoft 365 Group** calendars). Options are available to easily adjust how the timeline behaves, including configuring the tooltip, and there is support for making advanced configuration changes to refine the look and behavior of the timeline.
+---
 
-![Timeline Calendar web part](https://github.com/spsprinkles/timeline-calendar/assets/8918397/27d7632c-170e-443e-8b69-7d16fa6c3184)
+## Summary
 
-## 📖 User Guide
+- **Multi-source timeline** — Combine events from SharePoint lists and Graph-backed calendars in one place.
+- **Tabbed navigation** — Switch between **Calendar**, **Gantt Chart Timeline**, **Gantt Chart DABAL** (zoomed Gantt), and **30-60-90-120** (upcoming horizons) without leaving the web part.
+- **Calendar views** — **Day**, **5-Day Week**, **7-Day Week**, and **Month**. Day and week views use a **time grid** (6:00 AM–8:00 PM) with events positioned by start/end time, duration-based height, and side-by-side layout for overlaps—similar to Outlook or Google Calendar—not a simple list.
+- **Filtering & search** — **Category**, **Staff Section**, and **Calendar** filters with **cascading** behavior, plus **title search** to narrow events quickly.
+- **Readable Gantt** — Improved **label spacing** and layout logic to reduce overlap; **pagination** and **zoom** variants for long schedules.
+- **Calendar display names** — Friendly names for connected calendars where configured.
+- **Print / PDF** — **Print PDF** captures the **current calendar view** (grid layout and event placement) via a browser snapshot; includes a **point-in-time disclaimer** and generation timestamp in the PDF footer.
 
-Access the [**user/setup guide**](https://github.com/spsprinkles/timeline-calendar/wiki) for information on the specific options/properties available for customization. This includes details on both basic and advanced uses of the web part.
+For web part property-pane options and advanced JSON configuration, the upstream [**user/setup guide (wiki)**](https://github.com/spsprinkles/timeline-calendar/wiki) remains the best reference for shared Timeline Calendar behaviors.
 
-## 🔑 Graph API Permissions
+---
 
-As of version 0.6.0, the following [**delegated**](https://learn.microsoft.com/en-us/graph/permissions-overview#delegated-permissions) Graph API permissions/scopes are requested by the application. Failure to approve these permissions in the SPO Admin Center (or Azure Portal) will result in degraded functionality as specified below.
+## User-facing features
 
-| Permission | API             | Reason        |
-| ---------- | --------------- | ------------- |
-| User.Read  | [/me/memberOf](https://learn.microsoft.com/en-us/graph/api/user-list-memberof) | Get list of M365 Groups for the _current_ user |
-| User.Read.All | [/users](https://learn.microsoft.com/en-us/graph/api/user-list) | Search the directory for users & shared mailboxes (for the "people picker") |
-| Group.Read.All | [/groups](https://learn.microsoft.com/en-us/graph/api/group-list) | Search the directory for M365 Groups (for the "people picker") and get group calendar events that the _current_ user has access to |
-| Calendars.Read.Shared | [/users/${userId}/calendars](https://learn.microsoft.com/en-us/graph/api/user-list-calendars) | Query user's calendars that have been shared with the _current_ user |
+### Tabs
 
-## 📃 Content Security Policy (CSP)
+| Tab | Purpose |
+| --- | ------- |
+| **Calendar** | Month grid or day/week **time grids** with navigation (previous/next/today), view switcher, and **Print PDF**. |
+| **Gantt Chart Timeline** | Full-width Gantt-style timeline with pagination and layout tuned for readable labels. |
+| **Gantt Chart DABAL** | Alternate Gantt view with different zoom/scale (suited to dense or long-range planning). |
+| **30-60-90-120** | Upcoming-items lists grouped by **30 / 60 / 90 / 120** day horizons. |
 
-Loading external scripts (such as from CDNs) within SharePoint Online is [subject to CSP enforcement](https://learn.microsoft.com/en-us/sharepoint/dev/spfx/content-securty-policy-trusted-script-sources). The Timeline Calendar uses the Microsoft developed [Monaco Editor](https://github.com/microsoft/monaco-editor) for JSON & other configuration editing. It attempts to load the editor from the following CDN locations in the following order (except for USSec environment which is handled differently):
+### Calendar views and defaults
 
-1. https://cdnjs.cloudflare.com/
+- View buttons (left to right): **Day** → **5-Day Week** → **7-Day Week** → **Month**.
+- Opening the **Calendar** tab defaults to **Month** view.
+- **Day** shows one column; **5-Day** and **7-Day** show five or seven day columns.
+- **Time grid** (Day / 5-Day / 7-Day):
+  - Vertical axis from **6:00 AM** to **8:00 PM**.
+  - Hour lines are evenly spaced; events align to their scheduled times.
+  - Event **height reflects duration**; **overlapping** events are **stacked in columns** within the same day.
+- **Month** view uses a classic **month grid** (weeks × days).
 
-2. https://cdn.jsdelivr.net/
+### Filters
 
-SharePoint tenant administrators will need to follow the [Managing the Content Security Policy rules in SharePoint Online](https://learn.microsoft.com/en-us/sharepoint/dev/spfx/content-securty-policy-trusted-script-sources#managing-the-content-security-policy-rules-in-sharepoint-online) section of the CSP article for guidance on adding one (or both) of the above locations (with the trailing `/` character) in the "Trusted script sources" area of the admin portal.
+- **Category** — Filter by event category (with legend when applicable).
+- **Staff Section** — Narrow by staff/section metadata where used in your configuration.
+- **Calendar** — Limit to specific connected calendars; behavior is **cascading** with other filters so selections stay consistent.
+- **Title search** — Free-text filter on event titles.
 
-If the above locations are too "broad" for your tastes, you can scope them further to just the Monaco Editor path as shown below. Note that if you are adding the jsDelivr location, you must include the specific version as shown below. Again, it is important that you include the trailing `/` character:
+### Print PDF (Calendar tab only)
 
-1. https<nolink></nolink>://cdnjs.cloudflare.com/ajax/libs/monaco-editor/
+- Click **Print PDF** to generate a **downloadable PDF** of what you see in the calendar area (title + active view).
+- The export is **not** a plain event list: it preserves **grid structure**, **event positions**, and **spacing** as rendered on screen (rasterized via [html2canvas](https://html2canvas.hertzen.com/) and packaged with [jsPDF](https://github.com/parallax/jsPDF)).
+- Every PDF includes footer text: *This document is a point-in-time snapshot generated on [date/time] and may not reflect any changes made after that moment.*
 
-2. https<nolink></nolink>://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/
+> **Note:** Very tall views (for example a dense **Month** grid) are scaled to fit the PDF page; text may appear smaller than on screen. If you need poster-size or multi-page exports, that would be a future enhancement.
 
-> [!NOTE]
-> The above are *not* addresses that you can open in a browser, but are rather the address of the base container/folder of the script files that get loaded.
+---
 
-If no location is added to the "Trusted script sources" area, the Monaco Editor will fail to load and a simple textarea editor (which lacks syntax highlighting) will be shown to users as a fallback (as of version 0.6.5).
+## Developers
 
-## 📈 Version history
+### Prerequisites
 
-Refer to the [releases page](https://github.com/spsprinkles/timeline-calendar/releases) for specific details.
+- **Node.js 16.x** (SPFx 1.17.x requirement). An `.nvmrc` is provided in this folder for [nvm](https://github.com/nvm-sh/nvm) / compatible version managers.
 
-| Version | Date              | Comments        |
-| ------- | ----------------- | --------------- |
-| 0.6.5   | January 29, 2026  | Bug fixes for event duplication & box rendering and CSP fallback |
-| 0.6.4   | January 17, 2025  | Graph & advanced editor updates + visual improvements |
-| 0.6.3   | August 28, 2024   | Bug fixes for event querying |
-| 0.6.2   | May 3, 2024       | Enabled advanced code editor for DoD365-Sec |
-| 0.6.1   | March 18, 2024    | Several enhancements & bug fixes |
-| 0.6.0   | January 21, 2024  | New features (including Outlook calendar support) & bug fixes |
-| 0.5.3   | November 27, 2023 | Several bug fixes |
-| 0.5.2   | October 20, 2023  | Initial release |
+### Commands
 
-## ⚠️ Disclaimer
+```bash
+cd command-calendar-v2
+npm install
+npm run build      # debug bundle
+npm run package    # ship build + produce .sppkg for the App Catalog
+```
 
-**THIS CODE IS PROVIDED _AS IS_ WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.**
+The SharePoint package is written to:
+
+`sharepoint/solution/command-calendar-v2.sppkg`
+
+Upload that file to your tenant **App Catalog** (Apps for SharePoint), replace an existing package if needed, and deploy. Approve **Microsoft Graph** permission requests in the SharePoint admin center if prompted.
+
+### Notable dependencies (calendar PDF)
+
+- **html2canvas** — DOM snapshot for print fidelity.
+- **jspdf** (pinned to **2.x** for SPFx/webpack compatibility; v3 pulled dependencies that failed in this toolchain).
+
+### Source layout (high level)
+
+| Area | Role |
+| --- | ---- |
+| `TimelineCalendarTabbed.tsx` | Tabs, filters, calendar chrome, **Print PDF** trigger, view state. |
+| `CalendarTimeGrid.tsx` + `calendarTimeGridLayout.ts` | Time grid rendering, 6 AM–8 PM geometry, overlap lanes. |
+| `calendarPdfExport.ts` | PDF generation, footer disclaimer, reserved footer space. |
+| `ganttSchedulingLayout.ts` | Gantt label/row layout helpers. |
+
+---
+
+## Graph API permissions
+
+The web part requests the same **delegated** Microsoft Graph scopes as upstream Timeline Calendar. Approve them in the SharePoint admin experience (or Azure AD) or calendar and directory features will be limited.
+
+| Permission | Reason |
+| ---------- | ------ |
+| **User.Read** | Resolve the current user’s group memberships (e.g. M365 groups for calendar pickers). |
+| **User.Read.All** | Search users and shared mailboxes in people-style pickers. |
+| **Group.Read.All** | Search groups and read group calendar events the user can access. |
+| **Calendars.Read.Shared** | Read calendars shared with the current user. |
+
+---
+
+## Content Security Policy (CSP)
+
+Loading external scripts in SharePoint Online is subject to [CSP / trusted script sources](https://learn.microsoft.com/en-us/sharepoint/dev/spfx/content-securty-policy-trusted-script-sources). This web part uses the **Monaco Editor** for advanced JSON editing. It tries CDNs in order (unless your tenant uses a variant such as DoD365-Sec, which is handled differently):
+
+1. `https://cdnjs.cloudflare.com/`
+2. `https://cdn.jsdelivr.net/`
+
+Add one or both (with the **trailing `/`**) under **Trusted script sources** in the admin portal, per [Microsoft’s guidance](https://learn.microsoft.com/en-us/sharepoint/dev/spfx/content-securty-policy-trusted-script-sources#managing-the-content-security-policy-rules-in-sharepoint-online).
+
+For a narrower allow-list, you can scope to Monaco’s folder only (again include the trailing `/`):
+
+1. `https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/`
+2. `https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/`
+
+These are **base paths** for scripts the editor loads, not pages you browse to. If no trusted source is configured, Monaco may fail to load and a **plain textarea** fallback is used (as in upstream Timeline Calendar).
+
+See also the [upstream wiki / project](https://github.com/spsprinkles/timeline-calendar/wiki) for property and environment notes.
+
+---
+
+## Upstream & versioning
+
+- **Upstream project:** [spsprinkles/timeline-calendar](https://github.com/spsprinkles/timeline-calendar)  
+- **This package:** `command-calendar-v2` (see `package.json` / `config/package-solution.json` for current version).  
+- Historical release notes for the base product: [timeline-calendar releases](https://github.com/spsprinkles/timeline-calendar/releases).
+
+---
+
+## Disclaimer
+
+**THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.**
+
+Upstream Timeline Calendar is similarly provided as-is; this fork adds features on top of that baseline.
