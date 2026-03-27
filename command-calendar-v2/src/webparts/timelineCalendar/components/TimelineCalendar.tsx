@@ -41,6 +41,16 @@ interface IItemDateInfo {
   eventEndDate?: Date
 }
 
+/**
+ * vis-timeline stacks items using spatial overlap: each item's horizontal extent is
+ * roughly left + offsetWidth + margin.item.horizontal. Point items and short bars often
+ * have a narrow measured width while titles extend to the right (overflow: visible CSS),
+ * so the stacker sees no collision and piles dense recurring events on one row.
+ * A minimum margin approximates right-side label footprint — same idea as DABAL laneBlockingEndMs.
+ */
+const VIS_STACK_MIN_MARGIN_HORIZONTAL_PX = 96;
+const VIS_STACK_MIN_MARGIN_VERTICAL_PX = 14;
+
 export default class TimelineCalendar extends React.Component<ITimelineCalendarProps, {}> {
   private _timeline: Timeline;
   private _dsItems: any;
@@ -144,8 +154,10 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //this.context.domElement is undefined here
     const self = this;
     let reloadEvents = true;
+    const staffFilterChanged = JSON.stringify(prevProps.selectedStaffSectionKeys || []) !== JSON.stringify(this.props.selectedStaffSectionKeys || []);
     const categoryFilterChanged = JSON.stringify(prevProps.selectedCategoryKeys || []) !== JSON.stringify(this.props.selectedCategoryKeys || []);
     const calendarFilterChanged = JSON.stringify(prevProps.selectedCalendarKeys || []) !== JSON.stringify(this.props.selectedCalendarKeys || []);
+    const textFilterChanged = (prevProps.selectedTextFilter || "") !== (this.props.selectedTextFilter || "");
     //Check for specific property changes not requiring event reload
     // if (prevProps.categories != this.props.categories)
     //   reloadEvents = false;
@@ -218,10 +230,11 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
         filter: (item:any) => {
           if (item.type != "background") { //ignore weekend and special holiday events
             //Was checking (item.start.toISOString().substring(0, 10) == item.end.toISOString().substring(0, 10)), but the ISO time zone threw off some events
-            if (this.props.singleDayAsPoint && (item.end == null || item.start.toLocaleDateString() === item.end.toLocaleDateString())) //localDate == "11/27/2023"
-              item.type = "point";
-            else
-              item.type = "range";
+            item.type = "range";
+            if (item.end == null || item.end.getTime() < item.start.getTime()) {
+              item.end = new Date(item.start.getTime());
+              item.end.setHours(23, 59, 59, 999);
+            }
 
             return true;
           }
@@ -272,6 +285,8 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
         let options = this.options;
         const userOptions = JSON.parse(this.props.visJsonProperties); //just in case
         options = this.extend(true, options, userOptions); //userOptions override set "defaults" above
+        this.applyCommandCalendarStackingDefaults(options);
+        this.options = options;
         this._timeline.setOptions(options);
       }
       catch (e) {
@@ -290,7 +305,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       }
       return;
     }
-    else if (categoryFilterChanged || calendarFilterChanged) {
+    else if (staffFilterChanged || categoryFilterChanged || calendarFilterChanged || textFilterChanged) {
       reloadEvents = false;
     }
 
@@ -310,7 +325,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Only re-render events if needed
     if (reloadEvents)
       this.renderEvents();
-    else if (categoryFilterChanged || calendarFilterChanged)
+    else if (staffFilterChanged || categoryFilterChanged || calendarFilterChanged || textFilterChanged)
       this.applyExternalCategoryFilter();
   }
 
@@ -447,6 +462,26 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     return extended;
   }
 
+  /** vis-timeline vertical lane stacking; enforced after visJsonProperties merge so overlaps are always laid out in lanes. */
+  private applyCommandCalendarStackingDefaults(options: any): void {
+    if (!options) {
+      return;
+    }
+    options.stack = true;
+    options.stackSubgroups = true;
+    if (!options.margin) {
+      options.margin = {};
+    }
+    if (!options.margin.item) {
+      options.margin.item = {};
+    }
+    const mi = options.margin.item;
+    const h: number = typeof mi.horizontal === 'number' ? mi.horizontal : 0;
+    const v: number = typeof mi.vertical === 'number' ? mi.vertical : 0;
+    mi.horizontal = Math.max(h, VIS_STACK_MIN_MARGIN_HORIZONTAL_PX);
+    mi.vertical = Math.max(v, VIS_STACK_MIN_MARGIN_VERTICAL_PX);
+  }
+
   private calcMaxHeight():number {
     const container = document.getElementById("legend-" + this.props.instanceId);
     const rect = container.getBoundingClientRect();
@@ -489,6 +524,15 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     end: this.getViewEndDate(),           //initial end of loaded axis
     showCurrentTime: true,
     orientation: 'top',
+    stack: true,
+    stackSubgroups: true,
+    margin: {
+      item: {
+        horizontal: VIS_STACK_MIN_MARGIN_HORIZONTAL_PX,
+        vertical: VIS_STACK_MIN_MARGIN_VERTICAL_PX
+      },
+      axis: 8
+    },
     // orientation: {
     //   axis: "both",
     //   item: "top"
@@ -600,7 +644,8 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
         console.error(e);
       }
     }
-    
+    this.applyCommandCalendarStackingDefaults(this.options);
+
     //Generate the Timeline
     //---------------------------------
     const container = document.getElementById("timeline-" + this.props.instanceId);
@@ -1359,6 +1404,35 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
 
 `;
 
+    styleHtml += `
+/* Command Calendar: titles extend past short range bars (hourly events, etc.) */
+.container-${this.props.instanceId} .vis-timeline .vis-item.vis-range:not(.vis-item-background) {
+  overflow: visible !important;
+}
+.container-${this.props.instanceId} .vis-timeline .vis-item.vis-range:not(.vis-item-background) .vis-item-overflow {
+  overflow: visible !important;
+}
+.container-${this.props.instanceId} .vis-timeline .vis-item.vis-range:not(.vis-item-background) .vis-item-content {
+  overflow: visible !important;
+  max-width: none !important;
+  width: max-content;
+  min-width: 100%;
+  white-space: normal !important;
+  word-break: break-word;
+  text-overflow: clip;
+}
+/* Milestones / points: show full title (vis defaults to nowrap + clipped width) */
+.container-${this.props.instanceId} .vis-timeline .vis-item.vis-point:not(.vis-item-background) .vis-item-overflow {
+  overflow: visible !important;
+}
+.container-${this.props.instanceId} .vis-timeline .vis-item.vis-point:not(.vis-item-background) .vis-item-content {
+  overflow: visible !important;
+  max-width: none !important;
+  white-space: normal !important;
+  word-break: break-word;
+}
+`;
+
     if (this.props.fillFullWidth)
       styleHtml += `
 /* Force full width of page, and for workbench environment too */
@@ -1498,9 +1572,11 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     // Always restore first so filter changes can be re-applied cleanly
     this.restoreExternallyFilteredItems();
 
+    const selectedStaffSectionKeys = this.props.selectedStaffSectionKeys || [];
     const selectedCategoryKeys = this.props.selectedCategoryKeys || [];
     const selectedCalendarKeys = this.props.selectedCalendarKeys || [];
-    if (selectedCategoryKeys.length === 0 && selectedCalendarKeys.length === 0) {
+    const selectedTextFilter = (this.props.selectedTextFilter || "").trim().toLowerCase();
+    if (selectedStaffSectionKeys.length === 0 && selectedCategoryKeys.length === 0 && selectedCalendarKeys.length === 0 && selectedTextFilter.length === 0) {
       return;
     }
 
@@ -1509,6 +1585,14 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       filter: function(item:any): boolean {
         if (item.className === "weekend") {
           return false;
+        }
+
+        let staffMatches = (selectedStaffSectionKeys.length === 0);
+        if (!staffMatches) {
+          const staffSectionKey = self.getStaffSectionFilterKey(item);
+          if (staffSectionKey && selectedStaffSectionKeys.indexOf(staffSectionKey) !== -1) {
+            staffMatches = true;
+          }
         }
 
         let categoryMatches = (selectedCategoryKeys.length === 0);
@@ -1532,7 +1616,10 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
           }
         }
 
-        return !(categoryMatches && calendarMatches);
+        const itemTitle = String(item.content || item.title || "").toLowerCase();
+        const textMatches = selectedTextFilter.length === 0 || itemTitle.indexOf(selectedTextFilter) !== -1;
+
+        return !(staffMatches && categoryMatches && calendarMatches && textMatches);
       }
     });
 
@@ -1540,6 +1627,165 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       this._externallyFilteredItems = itemsToHide;
       this._dsItems.remove(itemsToHide);
     }
+  }
+
+  private getStaffSectionFilterKey(item:any): string {
+    const groupKey = item && item.group ? String(item.group) : "";
+    return groupKey;
+  }
+
+  private normalizeSplitMultiDayEvents(): void {
+    const eventItems = this._dsItems.get({
+      filter: function(item:any): boolean {
+        return item.className !== "weekend" && item.type !== "background";
+      }
+    });
+
+    const groupedItems: {[key: string]: any[]} = {};
+    eventItems.forEach((item:any) => {
+      if (!this.canBeMergedIntoMultiDay(item))
+        return;
+
+      const mergeKey = this.getMultiDayMergeKey(item);
+      if (!mergeKey)
+        return;
+
+      if (!groupedItems[mergeKey])
+        groupedItems[mergeKey] = [];
+      groupedItems[mergeKey].push(item);
+    });
+
+    const updates:any[] = [];
+    const removals:any[] = [];
+
+    Object.keys(groupedItems).forEach((groupKey:string) => {
+      const items = groupedItems[groupKey];
+      if (items.length < 2)
+        return;
+
+      items.sort((first:any, second:any) => {
+        return new Date(first.start).getTime() - new Date(second.start).getTime();
+      });
+
+      let runStartIndex = 0;
+      for (let idx = 1; idx <= items.length; idx++) {
+        const currentItem = items[idx];
+        const prevItem = items[idx - 1];
+        const isContinuation = currentItem ? this.isNextCalendarDay(prevItem.start, currentItem.start) : false;
+
+        if (!isContinuation) {
+          const run = items.slice(runStartIndex, idx);
+          if (run.length > 1) {
+            const baseItem = run[0];
+            const lastItem = run[run.length - 1];
+            const originalStart = new Date(baseItem.start);
+            const originalEnd = new Date(baseItem.end || baseItem.start);
+            const startOfOriginalDay = this.startOfDayDate(originalStart);
+            const dailyStartOffsetMs = originalStart.getTime() - startOfOriginalDay.getTime();
+            let dailyDurationMs = originalEnd.getTime() - originalStart.getTime();
+            if (dailyDurationMs <= 0)
+              dailyDurationMs = 60 * 60 * 1000;
+            const baseStart = this.startOfDayDate(new Date(baseItem.start));
+            const lastStart = this.startOfDayDate(new Date(lastItem.start));
+            const mergedEnd = this.addDaysDate(lastStart, 1); // end-exclusive
+
+            baseItem.start = baseStart;
+            baseItem.end = mergedEnd;
+            baseItem.type = "range";
+            baseItem.ccMergedDaily = true;
+            baseItem.ccDailyStartOffsetMs = dailyStartOffsetMs;
+            baseItem.ccDailyDurationMs = dailyDurationMs;
+            baseItem.ccMergedDays = run.length;
+            updates.push(baseItem);
+
+            for (let removeIdx = 1; removeIdx < run.length; removeIdx++) {
+              removals.push(run[removeIdx].id);
+            }
+          }
+
+          runStartIndex = idx;
+        }
+      }
+    });
+
+    if (updates.length > 0)
+      this._dsItems.update(updates);
+    if (removals.length > 0)
+      this._dsItems.remove(removals);
+  }
+
+  private canBeMergedIntoMultiDay(item:any): boolean {
+    if (!item || !item.start)
+      return false;
+
+    if (!this.getItemMergeIdentity(item))
+      return false;
+
+    const startDate = new Date(item.start);
+    const endDate = new Date(item.end || item.start);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()))
+      return false;
+
+    // Merge only single-day fragments (including end-exclusive midnight chunks).
+    const inclusiveEnd = new Date(endDate.getTime());
+    const isMidnight = inclusiveEnd.getHours() === 0 && inclusiveEnd.getMinutes() === 0 &&
+      inclusiveEnd.getSeconds() === 0 && inclusiveEnd.getMilliseconds() === 0;
+    if (inclusiveEnd.getTime() > startDate.getTime() && isMidnight)
+      inclusiveEnd.setMilliseconds(inclusiveEnd.getMilliseconds() - 1);
+
+    return this.startOfDayDate(startDate).getTime() === this.startOfDayDate(inclusiveEnd).getTime();
+  }
+
+  private getMultiDayMergeKey(item:any): string {
+    const sourceKey = this.getItemMergeIdentity(item);
+    if (!sourceKey)
+      return "";
+
+    const title = String(item.content || "");
+    const className = String(item.className || "");
+    const group = String(item.group || "");
+    return `${sourceKey}|${title}|${className}|${group}`;
+  }
+
+  private getItemMergeIdentity(item:any): string {
+    if (!item)
+      return "";
+
+    const sourceObj = item.sourceObj || {};
+    if (sourceObj.siteUrl && sourceObj.list && item.spId) {
+      const spId = String(item.spId);
+      const normalizedSpId = spId.split(".")[0];
+      return `sp|${sourceObj.siteUrl}|${sourceObj.list}|${normalizedSpId}`;
+    }
+
+    if (item.encodedAbsUrl)
+      return `sp|${String(item.encodedAbsUrl)}`;
+
+    if (item.eventId)
+      return `graph|${String(item.eventId)}`;
+    if (item.calEventWebLink)
+      return `graph|${String(item.calEventWebLink).split("?")[0]}`;
+
+    return "";
+  }
+
+  private startOfDayDate(dateValue:Date): Date {
+    const newDate = new Date(dateValue.getTime());
+    newDate.setHours(0, 0, 0, 0);
+    return newDate;
+  }
+
+  private addDaysDate(dateValue:Date, days:number): Date {
+    const newDate = new Date(dateValue.getTime());
+    newDate.setDate(newDate.getDate() + days);
+    return newDate;
+  }
+
+  private isNextCalendarDay(firstDate:any, secondDate:any): boolean {
+    const first = this.startOfDayDate(new Date(firstDate));
+    const second = this.startOfDayDate(new Date(secondDate));
+    const nextDay = this.addDaysDate(first, 1);
+    return nextDay.getTime() === second.getTime();
   }
 
   private getCalendarFilterKey(item:any): string {
@@ -1614,6 +1860,9 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       if (legendElem) {
         legendElem.style.display = (this.props.hideLegendBar ? "none" : "block");
       }
+
+      // Convert split single-day fragments into one multi-day range bar where applicable.
+      this.normalizeSplitMultiDayEvents();
 
       //Apply any external category filtering after events are loaded
       this.applyExternalCategoryFilter();
@@ -1773,7 +2022,7 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     if (configs.camlFilter == null || typeof configs.camlFilter !== "string")
       configs.camlFilter = null;
     if (configs.dateInUtc == null || typeof configs.dateInUtc !== "boolean")
-      configs.dateInUtc = true;
+      configs.dateInUtc = (list && list.isCalendar ? false : true);
     if (configs.visible == null || typeof configs.visible !== "boolean")
       configs.visible = true;
     if (configs.multipleCategories == null || typeof configs.multipleCategories !== "string")
@@ -1830,6 +2079,26 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     }
 
     return configs;
+  }
+
+  private parseGraphDateTime(dateTimeValue:string, sourceTimeZone:string, isAllDay:boolean): Date {
+    if (!dateTimeValue)
+      return null;
+
+    if (isAllDay)
+      return new Date(dateTimeValue);
+
+    const normalizedTimeZone = (sourceTimeZone || "").toUpperCase();
+    if (normalizedTimeZone === "UTC")
+      return new Date(dateTimeValue.indexOf("Z") === -1 ? dateTimeValue + "Z" : dateTimeValue);
+
+    // For non-UTC source zones, keep wall-clock time as delivered by Graph.
+    const parsedLocal = new Date(dateTimeValue);
+    if (!isNaN(parsedLocal.getTime()))
+      return parsedLocal;
+
+    // Fallback for safety
+    return new Date(dateTimeValue.indexOf("Z") === -1 ? dateTimeValue + "Z" : dateTimeValue);
   }
 
   private buildCalendarConfigs(calendar:ICalendarItem): ICalendarConfigs {
@@ -1998,17 +2267,14 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       //group: list.groupId //assigned next
     } as any;
     
-    //Add end date if applicable
+    //Add end date if applicable — always use range items (bars) on the timeline
     if (itemDateInfo.eventEndDate) {
       oEvent.end = itemDateInfo.eventEndDate;
-      //Force single day events as point?
-      //if (this.props.singleDayAsPoint && (elem.getAttribute(item.startFieldName).substring(0, 10) == elem.getAttribute(item.endFieldName).substring(0, 10)))
-      //Better handling for user's time zone
-      if (this.props.singleDayAsPoint && (itemDateInfo.eventStartDate.toLocaleDateString() === itemDateInfo.eventEndDate.toLocaleDateString()))
-        oEvent.type = "point";
     }
-    else //no end date, so make it a point
-      oEvent.type = "point";
+    else {
+      oEvent.end = new Date(itemDateInfo.eventStartDate.getTime());
+      oEvent.end.setHours(23, 59, 59, 999);
+    }
 
     //Add class/category
     if (listConfigs.className)
@@ -2038,7 +2304,8 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Add data to the event object (for later tooltip template processing)
     fieldKeys.forEach(field => {
       //Skip these fields to prevent their above defined value from being overwritten
-      if (field === "id" || field === "content" || field === "start" || field === "end" || field === "type" || field === "className")
+      if (field === "id" || field === "content" || field === "start" || field === "end" || field === "type" || field === "className" ||
+          field === "stack" || field === "stackSubgroups")
         return;
 
       let fieldValue = getFieldValue(field);
@@ -2113,6 +2380,13 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       }
     });
 
+    // Expanded recurrence instances (separate rows per occurrence) should not use multi-day span bars in calendar tab
+    if (list.isCalendar) {
+      const recurrenceIdVal = getFieldValue("RecurrenceID");
+      oEvent.ccIsExpandedRecurrenceInstance =
+        recurrenceIdVal != null && String(recurrenceIdVal).trim() !== "" && String(recurrenceIdVal).toLowerCase() !== "none";
+    }
+
     return oEvent;
   }
 
@@ -2165,11 +2439,11 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //All day event *end* dates show as the *next* day with 00:00:00 time
     let eventEndDate;
     if (calEvent.isAllDay) { //Change the end to be the end of the correct day
-      eventEndDate = new Date(calEvent.end.dateTime);
+      eventEndDate = this.parseGraphDateTime(calEvent.end.dateTime, calEvent.end.timeZone, true);
       eventEndDate.setMinutes(eventEndDate.getMinutes() -1); //shows as 23:59:00
     }
     else
-      eventEndDate = new Date(calEvent.end.dateTime + "Z");
+      eventEndDate = this.parseGraphDateTime(calEvent.end.dateTime, calEvent.end.timeZone, false);
 
     //Build the event obj
     const oEvent = {
@@ -2181,16 +2455,12 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       sourceObj: calendar,
       content: this.filterTextForXSS(strTitle),
       //title: elem.getAttribute("ows_Title"), //Tooltip
-      start: new Date(calEvent.start.dateTime + (calEvent.isAllDay ? "" : "Z")), //All day events treated as local time
+      start: this.parseGraphDateTime(calEvent.start.dateTime, calEvent.start.timeZone, calEvent.isAllDay), //All day events treated as local date
       end: eventEndDate,
       type: "range", //Changed later as needed
       //className: //assigned next
       //group: list.groupId //assigned next
     } as any;
-    
-    //Force single day events as point?
-    if (this.props.singleDayAsPoint && (oEvent.start.toLocaleDateString() === oEvent.end.toLocaleDateString()))
-      oEvent.type = "point";
 
     //Add class/category
     if (calConfigs.className)
@@ -2219,6 +2489,11 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
       oEvent.type = "background"; //change to background
       oEvent.group = null; //apply to entire timeline
     }
+
+    // Graph: occurrence/exception = one slice of a series (e.g. same meeting each week) — not a sequential multi-day block
+    const graphEventType: string = String(calEvent.type || "").toLowerCase();
+    oEvent.ccIsExpandedRecurrenceInstance =
+      graphEventType === "occurrence" || graphEventType === "exception";
     
     // //Call custom function if provided
     // if (TC.settings.beforeEventAdded)
@@ -2227,7 +2502,8 @@ export default class TimelineCalendar extends React.Component<ITimelineCalendarP
     //Add data to the event object (for later tooltip template processing)
     fieldKeys.forEach(field => {
       //Skip these fields to prevent their above defined value from being overwritten
-      if (field === "id" || field === "content" || field === "start" || field === "end" || field === "type" || field === "className")
+      if (field === "id" || field === "content" || field === "start" || field === "end" || field === "type" || field === "className" ||
+          field === "stack" || field === "stackSubgroups")
         return;
 
       let fieldValue = calEvent[field]; //TODO: support object values like organizer.emailAddress.address

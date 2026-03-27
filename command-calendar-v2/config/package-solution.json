@@ -3,7 +3,7 @@
   "solution": {
     "name": "Command Calendar V2",
     "id": "533b3ab7-a176-4f49-bf54-775d582c95db",
-    "version": "2.1.4.0",
+    "version": "2.1.10.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -49,7 +49,7 @@
         "title": "command-calendar-v2 Feature",
         "description": "The feature that activates elements of the command-calendar-v2 solution.",
         "id": "5d62164e-8333-475b-8105-9abb6ed6fbae",
-        "version": "2.1.4.0"
+        "version": "2.1.10.0"
       }
     ]
   },
