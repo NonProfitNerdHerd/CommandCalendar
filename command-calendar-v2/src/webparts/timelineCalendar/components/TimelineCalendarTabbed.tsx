@@ -1,5 +1,6 @@
 import * as React from 'react';
 import TimelineCalendar from './TimelineCalendar';
+import { CalendarDirectory } from './CalendarDirectory';
 import { ITimelineCalendarProps } from './ITimelineCalendarProps';
 import { CalendarTimeGrid } from './CalendarTimeGrid';
 import { clipIntervalToDayGrid } from './calendarTimeGridLayout';
@@ -24,7 +25,7 @@ import { Dropdown, IDropdownOption } from 'office-ui-fabric-react/lib/Dropdown';
 import { TextField } from 'office-ui-fabric-react/lib/TextField';
 import { TooltipHost } from 'office-ui-fabric-react/lib/Tooltip';
 
-type TViewKey = 'gantt' | 'ganttZoom' | 'calendar' | 'horizon';
+type TViewKey = 'gantt' | 'ganttZoom' | 'calendar' | 'horizon' | 'directory';
 type TCalendarMode = 'day' | 'week5' | 'week7' | 'month';
 
 interface ITimelineItem {
@@ -1041,6 +1042,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
           <TabButton isActive={activeView === 'gantt'} label="Gantt Chart Timeline" onClick={() => setActiveView('gantt')} />
           <TabButton isActive={activeView === 'ganttZoom'} label="Gantt Chart DABAL" onClick={() => setActiveView('ganttZoom')} />
           <TabButton isActive={activeView === 'horizon'} label="30-60-90-120" onClick={() => setActiveView('horizon')} />
+          <TabButton isActive={activeView === 'directory'} label="Calendar directory" onClick={() => setActiveView('directory')} />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -1102,7 +1104,7 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
         </div>
       </div>
 
-      {activeView !== 'gantt' && (
+      {activeView !== 'gantt' && activeView !== 'directory' && (
         <CategoryLegend options={categoryFilterOptions} selectedCategoryKeys={selectedCategoryKeys} />
       )}
 
@@ -1197,7 +1199,9 @@ const TimelineCalendarTabbed: React.FC<ITimelineCalendarProps> = (props: ITimeli
         <HorizonView events={nonGanttDisplayEvents} />
       </div>
 
-      {isLoadingData && (
+      {activeView === 'directory' && <CalendarDirectory {...props} />}
+
+      {isLoadingData && activeView !== 'directory' && (
         <div
           style={{
             position: 'absolute',

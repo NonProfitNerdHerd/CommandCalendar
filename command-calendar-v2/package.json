@@ -1,6 +1,6 @@
 {
   "name": "command-calendar-v2",
-  "version": "2.1.10",
+  "version": "2.1.11",
   "private": true,
   "engines": {
     "node": ">=16.13.0 <17.0.0"
@@ -10,7 +10,8 @@
     "build": "gulp bundle",
     "clean": "gulp clean",
     "package": "gulp clean --ship && gulp build --ship && gulp bundle --ship && gulp package-solution --ship",
-    "test": "gulp test"
+    "test": "gulp test",
+    "test:directory": "node tests/calendarDirectoryLinks.test.cjs"
   },
   "dependencies": {
     "@fluentui/react": "^7.199.1",

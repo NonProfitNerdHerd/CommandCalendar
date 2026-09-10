@@ -39,5 +39,7 @@ export interface ITimelineCalendarProps {
   cssOverrides: string;
   selectedCategoryKeys?: string[];
   selectedCalendarKeys?: string[];
+  selectedStaffSectionKeys?: string[];
+  selectedTextFilter?: string;
   hideLegendBar?: boolean;
 }

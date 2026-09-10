@@ -10,6 +10,30 @@ SharePoint Framework (SPFx) web part that aggregates **SharePoint** list/classic
 
 ## Summary
 
+### Release 2.1.11.0 — Calendar directory URLs
+
+- The **Calendar directory** tab reads the existing SharePoint calendar sources configured in the web part. It shows each display name and the full, clickable calendar URL, including the hostname.
+- Links are resolved at runtime by querying the saved list GUID for SharePoint's `DefaultViewUrl`. The directory does not construct paths from display names or insert `/Lists/` or `calendar.aspx`. Legitimate `/Lists/` paths are preserved.
+- Relative source URLs use the current web part's SharePoint web context. Each returned calendar path is resolved against its source web, including calendars on another site. There is no hardcoded SharePoint tenant or App Catalog URL. Absolute configured sources retain their original host.
+- Existing sources are resolved without opening or saving the property pane again. The directory includes calendars with no events and is independent of the event filters. Failed lookups show an unavailable message with **Retry links**, rather than a guessed link.
+- Outlook sources are listed by name with an instruction to open them in Outlook; this release resolves direct links for SharePoint sources. Outlook event loading is unchanged.
+- The solution ID, feature ID, web part ID, serialized property schema, and data version are unchanged. Calendar configuration is read without rewriting it.
+- Restored missing optional TypeScript declarations for the existing staff-section and title-search filter props so the production build compiles. This does not alter persisted settings or filter behavior.
+
+#### Upgrade and test
+
+1. Download **[Command-Calendar-V2.sppkg](../Command-Calendar-V2.sppkg)** (app version **2.1.11.0**, JavaScript package version **2.1.11**).
+2. Upload it to the **same tenant or site collection App Catalog** as the existing app, replace the existing package, and deploy. Keep the current app and web parts installed so their saved calendar settings remain in place.
+3. If the site-installed app offers an update in **Site contents**, apply that update. For tenant-wide deployment, existing web part instances use the updated assets after the package is deployed. See Microsoft's [deployment and update guidance](https://learn.microsoft.com/en-us/sharepoint/dev/spfx/tenant-scoped-deployment).
+4. Reload the existing page and open **Calendar directory**. Confirm that the configured display names remain and that the link text includes `https://` and the correct source hostname. Click each link and confirm it opens the intended calendar.
+5. Test a calendar on the current site, one on another site, and a calendar whose URL does not contain `/Lists/`. Repeat in another test tenant with sources configured for that tenant. Deploying the package does not copy calendar data or grant cross-tenant access.
+
+Automated validation: `npm run test:directory` checks dynamic tenant resolution, source-site selection, root sites, list renames, custom views, encoding, and lookup failures. `npm run package` compiles and bundles the production app and produces `sharepoint/solution/command-calendar-v2.sppkg`. The root download is a copy of that build output. Live navigation and preservation of the deployed page's settings must also be checked in SharePoint.
+
+Build note: SPFx treats output on stderr as failure. This release uses the locked dependencies with `BROWSERSLIST_IGNORE_OLD_DATA=true` to suppress the outdated browser-data notice (in PowerShell, set `$env:BROWSERSLIST_IGNORE_OLD_DATA = 'true'` before running the package command). The existing gulp configuration disables legacy lint; the release checks are the URL regression suite and production TypeScript/bundle/package tasks.
+
+SharePoint returns the list's actual server-relative default-view address through [`DefaultViewUrl`](https://learn.microsoft.com/en-us/previous-versions/office/sharepoint-visio/jj246956(v=office.15)); the directory turns that address into an absolute URL.
+
 - **Multi-source timeline** — Combine events from SharePoint lists and Graph-backed calendars in one place.
 - **Tabbed navigation** — Switch between **Calendar**, **Gantt Chart Timeline**, **Gantt Chart DABAL** (zoomed Gantt), and **30-60-90-120** (upcoming horizons) without leaving the web part.
 - **Calendar views** — **Day**, **5-Day Week**, **7-Day Week**, and **Month**. Day and week views use a **time grid** (6:00 AM–8:00 PM) with events positioned by start/end time, duration-based height, and side-by-side layout for overlaps—similar to Outlook or Google Calendar—not a simple list.
@@ -32,6 +56,7 @@ For web part property-pane options and advanced JSON configuration, the upstream
 | **Gantt Chart Timeline** | Full-width Gantt-style timeline with pagination and layout tuned for readable labels. |
 | **Gantt Chart DABAL** | Alternate Gantt view with different zoom/scale (suited to dense or long-range planning). |
 | **30-60-90-120** | Upcoming-items lists grouped by **30 / 60 / 90 / 120** day horizons. |
+| **Calendar directory** | Configured calendar display names and full SharePoint calendar links resolved dynamically from each source site. |
 
 ### Calendar views and defaults
 
